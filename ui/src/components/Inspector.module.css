@@ -258,3 +258,119 @@
   color: var(--text-muted);
   text-align: center;
 }
+
+/* Nested Section */
+.nestedSection {
+  margin: var(--space-sm) 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.nestedSectionHeader {
+  padding: var(--space-xs) var(--space-md);
+  background: var(--bg-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.nestedSectionContent {
+  background: var(--bg-secondary);
+}
+
+/* Child List */
+.childList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.childItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.childItem:hover {
+  background: var(--bg-hover);
+}
+
+.childIcon {
+  display: flex;
+  color: var(--text-accent);
+}
+
+.childName {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.childType {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+/* Loading State */
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xxl);
+  color: var(--text-muted);
+  gap: var(--space-md);
+}
+
+.loadingSpinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--text-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error State */
+.errorState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xxl);
+  color: var(--color-fault);
+  text-align: center;
+  gap: var(--space-sm);
+}
+
+.errorIcon {
+  width: 32px;
+  height: 32px;
+}
+
+/* Compact Property Row (for nested sections) */
+.nestedSection .propertyRow {
+  padding-left: var(--space-md);
+}
+
+.nestedSection .propertyRow:last-child {
+  border-bottom: none;
+}

@@ -81,8 +81,11 @@ export interface TreeNode {
   data?: unknown;
 }
 
-// Inspector Tab Types
+// Inspector Tab Types (legacy - for backward compatibility)
 export type InspectorTab = 'overview' | 'state' | 'configuration' | 'diagnostics' | 'communications';
 
 // Navigation Types
 export type Workspace = 'dashboard' | 'world' | 'devices' | 'network' | 'protocols' | 'scenarios' | 'data' | 'library' | 'settings' | 'developer';
+
+// Re-export Generic Inspector types
+export * from './inspector';

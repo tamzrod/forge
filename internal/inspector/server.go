@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -56,6 +57,7 @@ func NewServer(view *View, cfg Config) *Server {
 
 	mux.HandleFunc("/", server.handleIndex)
 	mux.HandleFunc("/api/state", server.handleState)
+	mux.HandleFunc("/api/inspect/", server.handleGenericInspect)
 	mux.HandleFunc("/ws", server.handleWebSocket)
 
 	server.server = &http.Server{
@@ -94,6 +96,29 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache")
 	json.NewEncoder(w).Encode(s.view.FullState())
+}
+
+// handleGenericInspect returns generic inspection data for an object.
+func (s *Server) handleGenericInspect(w http.ResponseWriter, r *http.Request) {
+	// Extract object ID from path: /api/inspect/{objectID}
+	path := r.URL.Path
+	objectID := path[len("/api/inspect/"):]
+	if objectID == "" {
+		objectID = "world"
+	}
+
+	generator := NewGenerator(s.view)
+	data, err := generator.Inspect(objectID)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	json.NewEncoder(w).Encode(data)
 }
 
 // handleWebSocket upgrades the connection and registers the client.

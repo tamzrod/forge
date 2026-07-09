@@ -35,6 +35,7 @@ See [Design Language](DESIGN_LANGUAGE.md) for detailed philosophy.
 | [Layout](LAYOUT.md) | Application layout, panels, and navigation |
 | [Colors](COLORS.md) | Semantic color system |
 | [Components](COMPONENTS.md) | Reusable UI components |
+| [Generic Inspector](GENERIC_INSPECTOR.md) | Data-driven inspection framework |
 
 ## Quick Reference
 
