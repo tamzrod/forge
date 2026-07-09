@@ -90,15 +90,20 @@ Devices communicate only by reading and writing memory. The runtime controls exe
 ```
 Device A (Weather Station)
 └── Writes irradiance → Device A Memory
+└── Publishes irradiance → Raw Ingest → MMA2
 
 Device B (PV Inverter)
 ├── Reads irradiance ← Device A Memory (external input)
 └── Writes power → Device B Memory
+└── Publishes power → Raw Ingest → MMA2
 
 Device C (Revenue Meter)
 ├── Reads power ← Device B Memory (external input)
 └── Writes energy → Device C Memory
+└── Publishes energy → Raw Ingest → MMA2
 ```
+
+Publishing to MMA2 is optional. Devices can maintain private state while exposing operational values.
 
 ## Device Types
 

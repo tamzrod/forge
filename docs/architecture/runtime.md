@@ -16,6 +16,7 @@ The runtime provides:
 | **Simulation Clock** | Tracks elapsed time |
 | **Device Registry** | Holds loaded devices |
 | **Plugin Loader** | Loads device types |
+| **Raw Ingest Publisher** | Publishes to MMA2 |
 | **Configuration** | Provides settings |
 
 That's the entire runtime.
@@ -24,27 +25,27 @@ That's the entire runtime.
 
 The runtime explicitly does not:
 
-- Own device memory
-- Execute device behaviors
-- Handle protocols
-- Manage faults
-- Own business concepts
+- Own device memory (devices own their memory)
+- Execute device behaviors (devices execute their behaviors)
+- Expose protocols (MMA2 exposes protocols)
+- Own operational memory (MMA2 owns operational memory)
 
 ## Runtime Structure
 
 ```go
 type Runtime struct {
-    scheduler Scheduler
-    clock    SimulationClock
-    devices  DeviceRegistry
-    plugins  PluginLoader
-    config   Config
+    scheduler    Scheduler
+    clock        SimulationClock
+    devices      DeviceRegistry
+    plugins      PluginLoader
+    rawIngest    RawIngestPublisher  // Publishes to MMA2
+    config       Config
 }
 ```
 
 The runtime is intentionally small.
 
-## No Memory Management
+## No Device Memory Management
 
 There is no memory manager. Memory belongs to devices.
 
@@ -55,6 +56,7 @@ type Runtime struct {
     clock       SimulationClock
     devices     DeviceRegistry
     plugins     PluginLoader
+    rawIngest   RawIngestPublisher
     // No memory manager
 }
 
@@ -87,23 +89,28 @@ func (d *Device) Tick() {
 
 ## No Protocol Handling
 
-The runtime does not handle protocols. Devices expose their own protocols.
+The runtime does not handle protocols. MMA2 handles protocols.
 
 ```go
-// Device exposes protocols
-meter := runtime.Device("meter-001")
-meter.ExposeProtocol("modbus", NewModbusAdapter())
+// Runtime connects to MMA2
+runtime.ConnectRawIngest("mma2:8080")
 
-// Runtime knows nothing about protocols
+// Runtime knows nothing about protocols - MMA2 owns them
 ```
 
-## No Fault Management
+## Raw Ingest Connection
 
-The runtime does not manage faults. Devices own their faults.
+The runtime connects to MMA2 via Raw Ingest:
 
 ```go
-device.AddFault(NewCommunicationLossFault())
+// Connect
+runtime.ConnectRawIngest(endpoint string) error
+
+// Disconnect
+runtime.Disconnect()
 ```
+
+Behaviors access the Raw Ingest publisher through their device.
 
 ## Domain Independence
 
@@ -142,15 +149,25 @@ Runtime: unchanged
 │                                                               │
 │  Plugin Loader ──▶ Device Registry                          │
 │                                                               │
+│  Raw Ingest Publisher ──▶ MMA2                             │
+│                                                               │
 │  Configuration                                               │
 │                                                               │
 └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                           MMA2                                │
+│                                                               │
+│  Operational Memory                                          │
+│  Modbus, DNP3, REST, MQTT...                               │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-The runtime is the smallest component. Devices are the system.
+The runtime is the smallest component. Devices are the system. MMA2 is separate.
 
 ## Key Principle
 
-**The runtime hosts devices. Devices own memory, behaviors, and protocols.**
+**The runtime hosts devices and publishes to MMA2. Devices own memory. MMA2 owns protocols.**
 
 The runtime disappears into the background.

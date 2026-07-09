@@ -2,181 +2,114 @@
 
 ## Philosophy
 
-**Protocols are external views of device memory.**
+**Protocols are NOT part of the simulation runtime.**
 
-A protocol adapter is not part of the simulation itself. It is an external interface that exposes an existing memory image.
+The simulation runtime publishes data to MMA2. MMA2 exposes protocols.
 
-## Protocol Principles
-
-A protocol adapter:
-
-1. **Never owns state** - It only exposes memory
-2. **Never owns behavior** - It only reads and writes memory
-3. **Never synchronizes** - Multiple protocols expose the same memory
-4. **Never transforms data** - It maps protocol concepts to memory
-
-## Protocol vs Simulation
+## Two Systems
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Simulation                              │
-│                                                               │
-│   ┌─────────────────────────────────────────────────────┐ │
-│   │                 Device Memory                         │ │
-│   │                                                      │ │
-│   │  Behaviors write here                               │ │
-│   └─────────────────────────────────────────────────────┘ │
-│                          ▲                                  │
-│                          │                                  │
-│                    Behaviors                               │
-└─────────────────────────────────────────────────────────────┘
-                           │
-                           │ exposed through
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   External Systems                           │
-│                                                               │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│   │  Modbus TCP   │  │     DNP3     │  │   REST API   │  │
-│   └──────────────┘  └──────────────┘  └──────────────┘  │
-│                                                               │
-│   Protocols are external to the simulation                   │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Simulation Runtime                                     │
+│                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐ │
+│   │                    Device Memory                                    │ │
+│   │  (private, internal)                                              │ │
+│   └─────────────────────────────────────────────────────────────────┘ │
+│                              │                                           │
+│                              ▼                                           │
+│   ┌─────────────────────────────────────────────────────────────────┐ │
+│   │                  Raw Ingest Publisher                              │ │
+│   │  (publishes to MMA2)                                             │ │
+│   └─────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              MMA2                                         │
+│                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐ │
+│   │                   Operational Memory                                │ │
+│   │  (shared, visible to all)                                        │ │
+│   └─────────────────────────────────────────────────────────────────┘ │
+│                              │                                           │
+│                              ▼                                           │
+│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │
+│   │  Modbus TCP   │  │     DNP3     │  │   REST API   │            │
+│   └──────────────┘  └──────────────┘  └──────────────┘            │
+│                                                                         │
+│   Protocols are in MMA2, not in the simulation runtime                │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Memory Exposure
+## The Runtime Does Not Expose Protocols
 
-A protocol adapter exposes device memory:
+The simulation runtime:
+- Maintains device memory
+- Publishes via Raw Ingest
+- **Does NOT expose Modbus, DNP3, or other protocols**
+
+MMA2:
+- Owns operational memory
+- Exposes protocols (Modbus, DNP3, REST, MQTT)
+- Is the integration point for external systems
+
+## Raw Ingest
+
+Raw Ingest is the official interface between the simulation runtime and MMA2.
 
 ```go
-type ModbusAdapter struct {
-    device *Device  // Exposes device memory
-}
-
-func (a *ModbusAdapter) ReadHoldingRegister(address uint16) uint16 {
-    return a.device.Memory().ReadUint16("holding_registers", uint32(address))
+type RawIngestPublisher interface {
+    Publish(tag string, value interface{}, quality Quality) error
 }
 ```
 
-All protocols expose the same memory. There is only one memory image.
-
-## Multiple Protocols
-
-A device can expose multiple protocol interfaces. All expose the same memory.
-
-```
-┌─────────────────────────────────────────────────────┐
-│                   Device Memory                       │
-│                                                     │
-│   ┌───────────────────────────────────────────┐   │
-│   │           Single Memory Image               │   │
-│   └───────────────────────────────────────────┘   │
-│                        ▲                            │
-│   ┌────────────────────┼────────────────────┐     │
-│   │                    │                    │     │
-│   ▼                    ▼                    ▼     │
-│ ┌──────┐        ┌──────┐         ┌──────┐     │
-│ │Modbus│        │ DNP3 │         │ REST │     │
-│ └──────┘        └──────┘         └──────┘     │
-│                                                     │
-│ Multiple views of the same memory                   │
-└─────────────────────────────────────────────────────┘
-```
-
-## Supported Protocols
-
-| Protocol | Domain | Mapping |
-|----------|--------|---------|
-| **Modbus TCP** | Industrial | Registers → Memory regions |
-| **DNP3** | SCADA | Points → Memory locations |
-| **REST** | Web | JSON → Memory read/write |
-| **MQTT** | IoT | Topics → Memory publish |
-
-## Protocol Interface
+Devices publish operational data:
 
 ```go
-type Protocol interface {
-    Attach(device *Device)
-    Detach()
+behavior.Tick() {
+    // Compute from device memory
+    irradiance := device.Memory().ReadFloat32("input_registers", irradianceAddr)
+    
+    // Publish to MMA2
+    publisher.Publish("weather/irradiance", irradiance, QualityGood)
 }
 ```
 
-The interface is minimal. A protocol only needs to know which device it exposes.
-
-## No Protocol Synchronization
-
-Protocols don't synchronize with each other. They all read from the same memory.
+## Why This Separation
 
 ```
-Protocol A reads memory
-Protocol B reads memory
-Protocol C reads memory
-
-No synchronization.
-Last write wins.
+Real Device                          Virtual Device
+     │                                   │
+     ▼                                   ▼
+Replicator                        Raw Ingest
+     │                                   │
+     └───────────────┬───────────────────┘
+                     │
+                     ▼
+              ┌─────────────┐
+              │    MMA2     │
+              │  (shared    │
+              │   state)    │
+              └─────────────┘
+                     │
+     ┌───────────────┼───────────────┐
+     ▼               ▼               ▼
+Modbus TCP        DNP3            REST
 ```
 
-This is intentional. Synchronization would introduce coupling between protocols.
-
-## No Protocol Caching
-
-Protocols don't cache device state:
-
-```go
-// Wrong - caching creates inconsistency
-type BadModbusAdapter struct {
-    device *Device
-    cache map[string][]byte  // No!
-}
-
-// Correct - always read memory
-type GoodModbusAdapter struct {
-    device *Device  // Exposes memory directly
-}
-```
-
-Caching would create a second source of truth.
-
-## Quality Propagation
-
-Protocols propagate memory quality flags:
-
-```go
-func (a *ModbusAdapter) ReadInputRegister(address uint16) (uint16, error) {
-    quality := a.device.Memory().Quality("input_registers", uint32(address))
-    if quality != QualityGood {
-        return 0, ModbusError{Code: quality}
-    }
-    return a.device.Memory().ReadUint16("input_registers", uint32(address)), nil
-}
-```
-
-## Fault Reflection
-
-Protocols reflect memory quality set by faults:
-
-| Fault | Effect |
-|-------|--------|
-| **Offline** | Protocols return offline quality |
-| **Bad Quality** | Protocols return bad quality |
-| **Frozen** | Protocols return frozen values |
-
-## Example: Device Exposes Protocols
-
-```go
-meter := runtime.CreateDevice(DeviceConfig{
-    ID:   "meter-001",
-    Type: "revenue_meter",
-})
-
-meter.ExposeProtocol("modbus", NewModbusAdapter("192.168.1.100:502"))
-meter.ExposeProtocol("rest", NewRESTAdapter(":8080"))
-```
-
-The device decides which protocols to expose. The runtime knows nothing about protocols.
+Atlas-PPC, SCADA, HMIs, and Historians read from MMA2. They cannot distinguish between real and virtual device origins.
 
 ## Key Principle
 
-**A protocol is an external view, not part of the simulation.**
+**The simulation runtime publishes data. MMA2 exposes protocols.**
 
-Protocols expose memory. They don't own memory. They don't create state. They don't synchronize.
+The runtime does not implement Modbus servers. The runtime does not implement DNP3 masters. The runtime only publishes to MMA2 via Raw Ingest.
+
+## Benefits
+
+1. **Clean separation** - Simulation is decoupled from integration
+2. **Real/virtual equivalence** - Both publish via Raw Ingest
+3. **MMA2 owns protocols** - Single point for protocol configuration
+4. **Scalability** - Multiple simulation runtimes can publish to one MMA2
+5. **Consistency** - Real and virtual devices appear identical

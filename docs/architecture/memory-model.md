@@ -4,13 +4,101 @@
 
 **Memory is the source of truth.**
 
-Memory-centric design is an architectural decision, not an implementation detail.
+There are TWO distinct memory domains. These must never be confused.
 
-## Why Memory as Foundation
+## Two Memory Domains
 
-A virtual device is fundamentally a memory image. Behaviors read and write memory. Protocols expose memory. This creates a simple, predictable system.
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Simulation Runtime                               │
+│                                                                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                   │
+│  │   Device A  │  │   Device B  │  │   Device C  │                   │
+│  │  ┌───────┐  │  │  ┌───────┐  │  │  ┌───────┐  │                   │
+│  │  │Device │  │  │  │Device │  │  │  │Device │  │                   │
+│  │  │Memory │  │  │  │Memory │  │  │  │Memory │  │                   │
+│  │  └───────┘  │  │  └───────┘  │  │  └───────┘  │                   │
+│  │   (private) │  │   (private) │  │   (private) │                   │
+│  └─────────────┘  └─────────────┘  └─────────────┘                   │
+│         │                │                │                             │
+│         └────────────────┼────────────────┘                             │
+│                          │                                              │
+│                          ▼                                              │
+│               ┌───────────────────┐                                    │
+│               │   Raw Ingest       │                                    │
+│               │   Publisher        │                                    │
+│               └───────────────────┘                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           MMA2                                           │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐  │
+│  │                   Operational Memory                              │  │
+│  │  (shared, visible to Atlas-PPC, SCADA, HMIs, Historians)         │  │
+│  │                                                                   │  │
+│  │  Exposed via Modbus, DNP3, REST, MQTT...                         │  │
+│  └─────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐  │
+│  │   Real Devices via Replicator                                    │  │
+│  │   Real Device → Replicator → Raw Ingest → MMA2                   │  │
+│  └─────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
-### Benefits
+### Domain 1: Device Memory
+
+- **Owned by**: Each virtual device
+- **Scope**: Private, internal
+- **Access**: Device behaviors only
+- **Purpose**: Internal device state and simulation logic
+- **Lifetime**: Tied to device lifecycle
+
+### Domain 2: Operational Memory (MMA2)
+
+- **Owned by**: MMA2 appliance
+- **Scope**: Shared, visible to all
+- **Access**: Atlas-PPC, SCADA, HMIs, Historians
+- **Purpose**: Plant-wide operational state
+- **Lifetime**: Persistent across simulation sessions
+
+## Why This Separation Exists
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                    Real Device vs Virtual Device                       │
+└──────────────────────────────────────────────────────────────────────┘
+
+Real Device                          Virtual Device
+     │                                   │
+     ▼                                   ▼
+Replicator                        Raw Ingest
+     │                                   │
+     └───────────────┬───────────────────┘
+                     │
+                     ▼
+              ┌─────────────┐
+              │    MMA2     │
+              │  (shared    │
+              │   state)    │
+              └─────────────┘
+                     │
+                     ▼
+         Atlas-PPC cannot distinguish
+         real from virtual origin
+```
+
+### Key Insight
+
+**Device Memory is NOT MMA2. MMA2 is NOT Device Memory.**
+
+A device maintains its own internal memory. When appropriate, the device publishes selected operational values into MMA2 via Raw Ingest.
+
+The simulator never writes Modbus registers directly. Raw Ingest is the official interface for publishing simulated operational data.
+
+## Benefits of Memory as Foundation (Device Memory)
 
 | Benefit | Explanation |
 |---------|-------------|
@@ -18,12 +106,9 @@ A virtual device is fundamentally a memory image. Behaviors read and write memor
 | **Simple serialization** | Memory is already structured; no object graph to serialize |
 | **Easy snapshots** | Freeze entire device state by copying memory |
 | **Replay capability** | Record memory writes for deterministic replay |
-| **Protocol independence** | Any protocol maps naturally to memory regions |
-| **Modbus compatibility** | Registers map directly to memory regions |
-| **DNP3 compatibility** | Points map directly to memory addresses |
-| **Low coupling** | Behaviors and protocols don't know about each other |
+| **Low coupling** | Behaviors don't know about MMA2 |
 | **Cache-friendly** | Sequential memory access patterns |
-| **Single source of truth** | One memory image, many protocol views |
+| **Internal state** | Device can track private simulation state |
 
 ### Comparison to Object Graphs
 
@@ -83,22 +168,32 @@ type MemoryLocation struct {
 | **Coil** | Read/Write | Binary control |
 | **Discrete Input** | Read | Binary status |
 
-## Memory Access
+## Device Memory Access
 
-Behaviors write to memory:
+Behaviors read and write device memory:
 
 ```go
 behavior.Tick() {
-    power := voltage * current
+    // Read internal state
+    irradiance := device.Memory().ReadFloat32("input_registers", irradianceAddr)
+    
+    // Compute
+    power := irradiance * efficiency
+    
+    // Write internal state
     device.Memory().WriteFloat32("input_registers", powerAddr, power)
 }
 ```
 
-Protocols read from memory:
+Behaviors may also publish to MMA2 via Raw Ingest:
 
 ```go
-adapter.HandleRead(address) {
-    return device.Memory().Read("input_registers", address)
+behavior.Tick() {
+    // Read from device memory
+    irradiance := device.Memory().ReadFloat32("input_registers", irradianceAddr)
+    
+    // Publish to operational memory (MMA2)
+    publisher.Publish("weather/irradiance", irradiance, QualityGood)
 }
 ```
 
@@ -130,24 +225,27 @@ func (b *Behavior) AccessOtherDevice(otherDevice *Device) {
 }
 ```
 
-## Device Communication Through Memory
+## Device Communication
 
 Devices communicate only through the runtime's execution order:
 
 ```
 Runtime executes Device A
 └── Device A behavior writes irradiance → Device A Memory
+└── Device A behavior publishes → Raw Ingest → MMA2
 
 Runtime executes Device B
 ├── Device B behavior reads irradiance ← Device A Memory
 └── Device B behavior writes power → Device B Memory
+└── Device B behavior publishes → Raw Ingest → MMA2
 
 Runtime executes Device C
 ├── Device C behavior reads power ← Device B Memory
 └── Device C behavior writes energy → Device C Memory
+└── Device C behavior publishes → Raw Ingest → MMA2
 ```
 
-The runtime controls execution order. Devices pass data through their own memory.
+The runtime controls execution order. Devices pass data through their own memory. Publishing to MMA2 is optional and controlled by each device.
 
 ## No Global Memory System
 
