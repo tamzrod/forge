@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  runtime:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: forge-runtime
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../config:/app/config:ro
+      - ../data:/app/data
+      - ../logs:/app/logs
+    environment:
+      - CONFIG_PATH=/app/config/runtime.yaml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pgrep", "-x", "forge"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

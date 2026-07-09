@@ -1,0 +1,23 @@
+# Runtime Configuration
+# This is the default configuration for the simulation runtime.
+
+tick_interval: 100ms
+max_devices: 1000
+
+# Logging
+logging:
+  level: info
+  file: /app/logs/runtime.log
+
+# Plugins
+plugins:
+  path: /app/plugins
+
+# Protocols
+protocols:
+  modbus:
+    enabled: true
+    port: 502
+  rest:
+    enabled: true
+    port: 8080
