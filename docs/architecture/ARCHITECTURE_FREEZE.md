@@ -17,6 +17,7 @@ The architecture was refined through multiple iterations until it satisfied thes
 5. **Deterministic** - Reproducible execution
 6. **Extensible** - New domains through plugins, no runtime changes
 7. **MMA2 Integration** - Clear separation between simulation and plant integration
+8. **Infrastructure Separation** - Shared simulated world distinct from devices
 
 The architecture is now considered a contract for implementation.
 
@@ -83,6 +84,42 @@ The runtime hosts devices. It provides scheduling, time advancement, plugin load
 
 Plugins provide device types. The runtime remains domain-independent. New domains require no runtime changes.
 
+### 10. Infrastructure is the Shared World
+
+Infrastructure represents the simulated world (Grid, Sun, Wind, Ambient Temperature). Infrastructure is observed by devices. Infrastructure has no protocols and no device identity.
+
+## Three-Layer Architecture
+
+The architecture consists of three layers:
+
+```
+Simulation Runtime
+        │
+        ▼
+Simulation Infrastructure
+        │
+        ▼
+Virtual Devices
+```
+
+### Layer 1: Simulation Runtime
+
+The runtime hosts infrastructure and devices. It provides scheduling, time advancement, and plugin loading.
+
+### Layer 2: Simulation Infrastructure
+
+Infrastructure represents the shared simulated world. Examples:
+- Grid (electrical)
+- Sun, Wind, Ambient Temperature
+- Reservoir, River
+- Factory Utilities
+
+Infrastructure has no protocols, no external clients, and no device identity. It is observed by devices.
+
+### Layer 3: Virtual Devices
+
+Devices observe infrastructure. Devices own memory and publish operational data via Raw Ingest.
+
 ## Ownership Rules
 
 ```
@@ -91,7 +128,15 @@ Simulation Runtime owns:
 ├── Simulation Clock
 ├── Device Registry
 ├── Plugin Loader
+├── Infrastructure Registry
 └── Raw Ingest Publisher
+
+Infrastructure owns:
+├── Grid State
+├── Sun State
+├── Wind State
+├── Ambient State
+└── Other Shared World State
 
 Device owns:
 ├── Device Memory (private)
@@ -114,6 +159,7 @@ MMA2 owns:
 - Scheduling
 - Time management
 - Plugin loading
+- Infrastructure state
 - Operational memory
 - Protocols
 
@@ -122,16 +168,29 @@ MMA2 owns:
 - Scheduling
 - Time advancement
 - Device lifecycle
+- Infrastructure lifecycle
 - Plugin loading
 - Raw Ingest connection
 
 ### What the Runtime Does Not Own
 
 - Device Memory
+- Infrastructure State
 - Behaviors
 - Operational memory
 - Protocols
 - Domain logic
+
+### What Infrastructure Owns
+
+- Shared world state (Grid, Sun, Wind, etc.)
+- Infrastructure behaviors
+
+### What Infrastructure Does Not Own
+
+- Device Memory
+- Protocols
+- Device identity
 
 ### What MMA2 Owns
 
@@ -141,6 +200,7 @@ MMA2 owns:
 ### What MMA2 Does Not Own
 
 - Device Memory
+- Infrastructure State
 - Behaviors
 - Simulation logic
 
