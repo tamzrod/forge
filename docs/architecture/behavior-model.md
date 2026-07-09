@@ -2,7 +2,7 @@
 
 ## Philosophy
 
-**Behaviors are logic that reads and writes device memory, and observes infrastructure.**
+**Behaviors are logic that reads and writes device memory, and observes simulation models.**
 
 A device owns its behaviors. Behaviors may optionally publish to MMA2 via Raw Ingest.
 
@@ -10,7 +10,7 @@ A device owns its behaviors. Behaviors may optionally publish to MMA2 via Raw In
 
 A behavior:
 
-1. Observes infrastructure (Sun, Grid, Wind, etc.)
+1. Observes simulation models (Sun, Grid, Wind, etc.)
 2. Reads from device memory
 3. Computes new values
 4. Writes to device memory
@@ -22,7 +22,7 @@ A behavior:
 
 ```
 ┌─────────────────┐
-│  Infrastructure │ (Grid, Sun, Wind)
+│ Simulation Model │ (Grid, Sun, Wind)
 └────────┬────────┘
          │ observes
          ▼
@@ -51,6 +51,7 @@ A behavior:
 ```go
 type Device struct {
     behaviors []Behavior
+    modelGetter func(ModelID) Model  // Access to models
 }
 
 func (d *Device) Tick() {
@@ -72,12 +73,16 @@ type Behavior interface {
     Tick()
 }
 
-// Device behavior has infrastructure reference
+// Device behavior observes models
 type DeviceBehavior struct {
-    device       *Device
-    infrastructure *Infrastructure
-    rawIngest    RawIngestClient
-    unitID       uint16
+    device     *Device
+    rawIngest  RawIngestClient
+    unitID     uint16
+}
+
+// Observe models through device
+func (b *DeviceBehavior) observeModel(id models.ModelID) models.Model {
+    return b.device.Model(id)
 }
 ```
 
@@ -85,17 +90,21 @@ type DeviceBehavior struct {
 
 ```go
 type WeatherBehavior struct {
-    device         *Device
-    infrastructure *Infrastructure
-    rawIngest      RawIngestClient
-    unitID         uint16
+    device    *Device
+    rawIngest RawIngestClient
+    unitID    uint16
 }
 
 func (b *WeatherBehavior) Tick() {
-    // Observe infrastructure (shared simulated world)
-    irradiance := b.infrastructure.Sun().Irradiance()
-    temperature := b.infrastructure.Ambient().Temperature()
-    windSpeed := b.infrastructure.Wind().Speed()
+    // Observe simulation models
+    sun := b.device.Model("weather-sun")
+    irradiance := sun.Irradiance()
+    
+    weather := b.device.Model("ambient-weather")
+    temperature := weather.Temperature()
+    
+    wind := b.device.Model("weather-wind")
+    windSpeed := wind.Speed()
     
     // Add measurement noise (simulated sensor)
     measured := b.addNoise(irradiance, temperature, windSpeed)
@@ -111,23 +120,31 @@ func (b *WeatherBehavior) Tick() {
 }
 ```
 
-## Example: PV Model Behavior
+## Example: PV Inverter Behavior
 
 ```go
-type PVModelBehavior struct {
-    device         *Device
-    infrastructure *Infrastructure
-    rawIngest      RawIngestClient
-    unitID         uint16
+type PVInverterBehavior struct {
+    device    *Device
+    rawIngest RawIngestClient
+    unitID    uint16
 }
 
-func (b *PVModelBehavior) Tick() {
-    // Observe infrastructure (not device memory)
-    irradiance := b.infrastructure.Sun().Irradiance()
-    temperature := b.infrastructure.Ambient().Temperature()
+func (b *PVInverterBehavior) Tick() {
+    // Observe sun model
+    sun := b.device.Model("solar-sun")
+    irradiance := sun.Irradiance()
+    temperature := sun.Elevation() // Affects efficiency
+    
+    // Observe ambient temperature from weather model
+    weather := b.device.Model("ambient-weather")
+    ambientTemp := weather.Temperature()
     
     // Compute DC power from sun
-    dcPower := b.calculatePower(irradiance, temperature)
+    dcPower := b.calculatePower(irradiance, ambientTemp)
+    
+    // Inject power into grid model
+    grid := b.device.Model("main-grid")
+    grid.InjectActivePower(dcPower)
     
     // Write to device memory
     b.device.Memory().WriteFloat32("output", powerAddr, dcPower)
@@ -147,14 +164,15 @@ func encodeFloat32(value float32, min, max float32) []byte {
 
 **Note:** Encoding and scaling are device responsibilities. The behavior owns the engineering semantics.
 
-## Infrastructure Observation Pattern
+## Model Observation Pattern
 
-Behaviors observe infrastructure, not other devices:
+Behaviors observe models, not other devices:
 
 ```go
-// Correct: Observe infrastructure
+// Correct: Observe model
 func (b *PVBehavior) Tick() {
-    irradiance := b.infrastructure.Sun().Irradiance()
+    sun := b.device.Model("solar-sun")
+    irradiance := sun.Irradiance()
 }
 
 // Incorrect: Access other device
@@ -169,7 +187,7 @@ func (b *BadBehavior) Tick() {
 
 Behaviors are deterministic:
 
-- Same infrastructure state → same device behavior
+- Same model state → same device behavior
 - No randomness without seeded RNG
 - No external system calls (except Raw Ingest publish)
 - No time-of-day dependencies (use simulation clock)
@@ -181,3 +199,23 @@ Publishing to MMA2 is optional. A behavior may:
 - Write to device memory AND publish to MMA2 (operational data)
 
 This allows devices to maintain private simulation state while exposing only relevant operational values.
+
+## Model Injection Pattern
+
+Some devices can inject back into models:
+
+```go
+// PV Inverter injects power into grid
+func (b *PVInverterBehavior) Tick() {
+    // Observe sun model
+    sun := b.device.Model("solar-sun")
+    power := b.calculatePower(sun.Irradiance())
+    
+    // Inject power into grid model
+    grid := b.device.Model("main-grid")
+    grid.InjectActivePower(power)  // Bidirectional
+    
+    // Publish to MMA2
+    b.rawIngest.WriteInputRegisters(b.unitID, 0, encode(power))
+}
+```

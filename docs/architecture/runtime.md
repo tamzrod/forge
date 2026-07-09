@@ -2,7 +2,7 @@
 
 ## Philosophy
 
-**The runtime hosts devices. That's all.**
+**The runtime hosts simulation models and devices. That's all.**
 
 The runtime provides common infrastructure. It contains no domain knowledge.
 
@@ -14,8 +14,9 @@ The runtime provides:
 |-----------|---------|
 | **Scheduler** | Advances simulation time |
 | **Simulation Clock** | Tracks elapsed time |
+| **Model Registry** | Holds simulation models |
 | **Device Registry** | Holds loaded devices |
-| **Plugin Loader** | Loads device types |
+| **Plugin Loader** | Loads device types and model types |
 | **Raw Ingest Publisher** | Publishes to MMA2 |
 | **Configuration** | Provides settings |
 
@@ -25,7 +26,9 @@ That's the entire runtime.
 
 The runtime explicitly does not:
 
+- Own model state (models own their state)
 - Own device memory (devices own their memory)
+- Execute model behaviors (models execute their behaviors)
 - Execute device behaviors (devices execute their behaviors)
 - Expose protocols (MMA2 exposes protocols)
 - Own operational memory (MMA2 owns operational memory)
@@ -36,7 +39,8 @@ The runtime explicitly does not:
 type Runtime struct {
     scheduler    Scheduler
     clock        SimulationClock
-    devices      DeviceRegistry
+    models       map[ModelID]Model
+    devices      map[DeviceID]*Device
     plugins      PluginLoader
     rawIngest    RawIngestPublisher  // Publishes to MMA2
     config       Config
@@ -45,80 +49,65 @@ type Runtime struct {
 
 The runtime is intentionally small.
 
-## No Device Memory Management
+## Model Management
+
+The runtime manages simulation models. Models represent the physical world.
+
+```go
+// Runtime manages models
+type Runtime struct {
+    scheduler    Scheduler
+    models       map[ModelID]Model  // Simulation Models
+    devices      map[DeviceID]*Device
+}
+
+// Create models
+runtime.CreateGridModel("main-grid")
+runtime.CreateSunModel("solar-sun")
+runtime.CreateWindModel("wind-farm")
+
+// Access models
+grid := runtime.Model("main-grid")
+```
+
+## Device Memory Management
 
 There is no memory manager. Memory belongs to devices.
 
 ```go
-// Runtime does not manage memory
-type Runtime struct {
-    scheduler   Scheduler
-    clock       SimulationClock
-    devices     DeviceRegistry
-    plugins     PluginLoader
-    rawIngest   RawIngestPublisher
-    // No memory manager
-}
-
 // Devices own memory
 type Device struct {
     memory *MemoryImage  // Device owns this
 }
 ```
 
-## No Behavior Execution
+## Execution Order
 
-The runtime does not execute behaviors. Devices execute their own behaviors.
+The scheduler executes models before devices:
 
 ```go
-// Runtime just asks
-func (r *Runtime) tick() {
-    for _, device := range r.devices.All() {
-        device.Tick()  // Device executes its behaviors
+func (s *Scheduler) tick() {
+    // 1. Models evolve first (physics)
+    for _, model := range s.models {
+        model.Tick()
     }
-    r.clock.Advance()
-}
-
-// Device executes
-func (d *Device) Tick() {
-    for _, behavior := range d.behaviors {
-        behavior.Tick()
+    
+    // 2. Devices observe models and update memory
+    for _, device := range s.devices {
+        device.Tick()
     }
+    
+    // 3. Advance clock
+    s.clock.Advance()
 }
 ```
-
-## No Protocol Handling
-
-The runtime does not handle protocols. MMA2 handles protocols.
-
-```go
-// Runtime connects to MMA2
-runtime.ConnectRawIngest("mma2:8080")
-
-// Runtime knows nothing about protocols - MMA2 owns them
-```
-
-## Raw Ingest Connection
-
-The runtime connects to MMA2 via Raw Ingest:
-
-```go
-// Connect
-runtime.ConnectRawIngest(endpoint string) error
-
-// Disconnect
-runtime.Disconnect()
-```
-
-Behaviors access the Raw Ingest publisher through their device.
 
 ## Domain Independence
 
 The runtime knows nothing about:
 
-- Energy
-- Water
-- Manufacturing
+- Energy, Water, Manufacturing
+- Grid, Sun, Wind, Weather
 - Any industrial domain
 - float32, int32, or any data type
 - Engineering units
@@ -132,58 +121,37 @@ All domain knowledge lives in plugins.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           Runtime (Infrastructure)                        │
+│                           Simulation Runtime                              │
 │                                                                         │
-│  Scheduler │ Clock │ Device Registry │ Plugin Loader                   │
-│                                                                         │
-│  RAW INGEST CLIENT (low-level memory operations only)                   │
-│  - WriteHoldingRegisters()                                              │
-│  - WriteInputRegisters()                                               │
-│  - WriteCoils()                                                        │
-│  - WriteDiscreteInputs()                                                │
-│                                                                         │
-│  The runtime does NOT know:                                            │
-│  - float32, int32                                                      │
-│  - Temperature, Voltage, Power                                         │
-│  - Engineering units or scaling                                         │
-│  - Register maps                                                        │
+│  Scheduler ──▶ Simulation Clock                                        │
+│  Plugin Loader ──▶ Model Registry │ Device Registry                    │
+│  Raw Ingest Publisher ──▶ MMA2                                        │
+│  Configuration                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
+                                    │
+                                    ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         Device (Domain Logic)                             │
+│                       Simulation Models                                   │
 │                                                                         │
-│  Weather Device │ PV Device │ Meter Device │ etc.                     │
+│  Grid Model │ Sun Model │ Wind Model │ Weather Model                   │
 │                                                                         │
-│  Each device knows:                                                    │
-│  - Its own engineering semantics                                        │
-│  - How to encode values (float32 → uint16)                            │
-│  - How to scale values                                                 │
-│  - Its register allocation in MMA2                                     │
-│                                                                         │
-│  Device encodes and calls runtime's low-level Raw Ingest               │
+│  - Represent physics (not equipment)                                   │
+│  - Store state in private RAM                                          │
+│  - Never expose protocols                                              │
+│  - Never publish to MMA2                                               │
 └─────────────────────────────────────────────────────────────────────────┘
-```
-
-This separation ensures:
-- A developer can add a new device type without modifying the runtime
-- The runtime remains generic enough for any industrial domain
-- Domain knowledge is encapsulated in plugins
-
-## Adding New Domains
-
-Adding a new domain requires only:
-
-1. New plugins with device types
-2. No runtime changes
-
-```
-New Domain Plugin
-├── Device Type A
-├── Device Type B
-└── Device Type C
-
-Runtime: unchanged
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          Virtual Devices                                  │
+│                                                                         │
+│  Weather Device │ PV Device │ Meter Device                             │
+│                                                                         │
+│  - Represent equipment (not physics)                                   │
+│  - Observe models through behaviors                                     │
+│  - Own device memory                                                   │
+│  - Publish to MMA2 via Raw Ingest                                      │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Architecture
@@ -194,27 +162,36 @@ Runtime: unchanged
 │                                                               │
 │  Scheduler ──▶ Simulation Clock                              │
 │                                                               │
-│  Plugin Loader ──▶ Device Registry                          │
+│  Plugin Loader ──▶ Model Registry ──▶ Simulation Models     │
+│                   │                                         │
+│                   └──▶ Device Registry ──▶ Virtual Devices  │
 │                                                               │
-│  Raw Ingest Publisher ──▶ MMA2                             │
+│  Raw Ingest Publisher ──▶ MMA2 ──▶ Protocols               │
 │                                                               │
 │  Configuration                                               │
-│                                                               │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                           MMA2                                │
-│                                                               │
-│  Operational Memory                                          │
-│  Modbus, DNP3, REST, MQTT...                               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-The runtime is the smallest component. Devices are the system. MMA2 is separate.
+The runtime is the smallest component. Models represent physics. Devices observe physics. MMA2 exposes operational telemetry.
 
 ## Key Principle
 
-**The runtime hosts devices and publishes to MMA2. Devices own memory. MMA2 owns protocols.**
+**The runtime hosts models and devices. Models represent physics. Devices observe physics and publish to MMA2. MMA2 owns protocols.**
 
 The runtime disappears into the background.
+
+## Model Types
+
+| Domain | Models |
+|--------|--------|
+| **Energy** | Grid, Sun, Wind, Weather |
+| **Water** | Reservoir, Hydraulic Network, River |
+| **Manufacturing** | Factory Power, Compressed Air, Conveyor Physics |
+
+## Device Types
+
+| Domain | Devices |
+|--------|---------|
+| **Energy** | Weather Station, PV Inverter, Revenue Meter, Relay |
+| **Water** | Pump, Valve, Flow Meter, Tank Sensor |
+| **Manufacturing** | PLC, Robot, Conveyor, Sensor |

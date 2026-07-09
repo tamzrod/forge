@@ -2,8 +2,10 @@
 // A device is a deterministic memory image with executable behavior and protocol interfaces.
 package device
 
+import "github.com/tamzrod/forge/models"
+
 // Behavior is the interface for device behaviors.
-// Behaviors read and write device memory.
+// Behaviors read and write device memory, and observe simulation models.
 type Behavior interface {
 	// ID returns a unique identifier for this behavior.
 	ID() string
@@ -17,8 +19,15 @@ type Behavior interface {
 	Detach()
 
 	// Tick executes one simulation step.
-	// The behavior should read from and write to device memory.
+	// The behavior should observe models, read from and write to device memory.
 	Tick()
+}
+
+// ModelObserver is an interface for behaviors that observe simulation models.
+type ModelObserver interface {
+	// ObserveModel provides access to a simulation model.
+	// Returns nil if the model does not exist.
+	ObserveModel(id models.ModelID) models.Model
 }
 
 // BehaviorFunc is an adapter that allows a function to satisfy Behavior.

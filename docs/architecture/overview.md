@@ -2,7 +2,7 @@
 
 ## Architectural Philosophy
 
-**The devices are the system. Infrastructure is the world they inhabit. The runtime hosts both.**
+**The devices are the system. Simulation Models represent the physical world. The runtime hosts both.**
 
 This architecture describes an ecosystem of virtual industrial devices within a simulated world. Every design decision reinforces a single principle:
 
@@ -13,10 +13,10 @@ This architecture describes an ecosystem of virtual industrial devices within a 
 1. **Devices own memory** - Every virtual device owns its memory image
 2. **Behaviors modify memory** - Logic reads from and writes to device memory
 3. **Protocols expose memory** - External systems read device memory through protocols
-4. **Devices never communicate directly** - Devices observe infrastructure and publish results
-5. **Infrastructure represents the shared world** - Grid, Sun, Wind, Environment
-6. **Runtime provides infrastructure** - The runtime hosts, schedules, and coordinates
-7. **Plugins provide domain knowledge** - New domains add device types and infrastructure, not runtime changes
+4. **Devices never communicate directly** - Devices observe models and publish results
+5. **Simulation Models represent the physical world** - Grid, Sun, Wind, Weather
+6. **Runtime provides hosting** - The runtime hosts models, devices, schedules, and coordinates
+7. **Plugins provide domain knowledge** - New domains add model types and device types, not runtime changes
 
 ### Why Memory as Foundation
 
@@ -75,11 +75,11 @@ Energy is only one possible plugin domain.
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                  Simulation Infrastructure                        │
+│                      Simulation Models                           │
 │                                                               │
-│  Grid │ Sun │ Wind │ Ambient Temperature │ Geography            │
+│  Grid │ Sun │ Wind │ Weather │ Reservoir │ Hydraulic            │
 │                                                               │
-│  Shared world - no protocols - observed by devices            │
+│  Physical world - private RAM - observed by devices            │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -88,11 +88,33 @@ Energy is only one possible plugin domain.
 │                                                               │
 │  Revenue Meter │ Weather Station │ PV Inverter │ Relay         │
 │                                                               │
-│  Observe infrastructure, publish to MMA2                       │
+│  Observe models, publish to MMA2                               │
+└─────────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Operational Publisher                          │
+└─────────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                              MMA2                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-Three layers: Runtime → Infrastructure → Devices
+Four layers: Runtime → Models → Devices → MMA2
+
+### Data Flow
+
+```
+Simulation Truth (Models)
+        ↓
+Device Observation (Behaviors read models)
+        ↓
+Operational Telemetry (Devices publish to MMA2)
+        ↓
+Control Applications (Atlas-PPC, SCADA, Historians)
+```
 
 ---
 
@@ -111,16 +133,16 @@ Every virtual device owns:
 
 ## Plugin Types (from plugins)
 
-Plugins provide both **Infrastructure** and **Devices**:
+Plugins provide both **Simulation Models** and **Devices**:
 
 ```
 Energy Plugin
 
-Infrastructure:
-├── Grid
-├── Sun
-├── Wind
-└── Ambient Temperature
+Simulation Models:
+├── Grid Model
+├── Sun Model
+├── Wind Model
+└── Weather Model
 
 Devices:
 ├── Weather Station
@@ -130,10 +152,10 @@ Devices:
 
 Water Plugin
 
-Infrastructure:
-├── Reservoir
-├── River
-└── Ambient Temperature
+Simulation Models:
+├── Reservoir Model
+├── River Model
+└── Hydraulic Network Model
 
 Devices:
 ├── Pump
@@ -142,7 +164,7 @@ Devices:
 └── Flow Meter
 ```
 
-Infrastructure provides the shared world. Devices observe infrastructure and publish to MMA2.
+Simulation Models provide the physical world. Devices observe models and publish to MMA2.
 
 ---
 
@@ -161,8 +183,8 @@ Infrastructure provides the shared world. Devices observe infrastructure and pub
 
 | Document | Description |
 |----------|-------------|
-| [Runtime](runtime.md) | Hosts infrastructure and devices |
-| [Infrastructure Model](infrastructure-model.md) | Shared simulated world |
+| [Runtime](runtime.md) | Hosts models and devices |
+| [Simulation Models](simulation-models.md) | Physical world representation |
 | [Device Model](device-model.md) | Virtual device structure |
 | [Memory Model](memory-model.md) | Device memory ownership |
 | [Behavior Model](behavior-model.md) | Device-owned logic |

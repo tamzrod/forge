@@ -1,5 +1,5 @@
 // Package runtime provides the simulation runtime.
-// The runtime hosts devices. That's all.
+// The runtime hosts simulation models and devices.
 package runtime
 
 import (
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tamzrod/forge/device"
+	"github.com/tamzrod/forge/models"
 	"github.com/tamzrod/forge/scheduler"
 	"gopkg.in/yaml.v3"
 )
@@ -51,10 +52,11 @@ func LoadConfig(path string) (Config, error) {
 }
 
 // Runtime is the simulation runtime.
-// It hosts devices and provides scheduling infrastructure.
+// It hosts simulation models and devices, and provides scheduling infrastructure.
 type Runtime struct {
 	config    Config
 	sched     *scheduler.Scheduler
+	models    map[models.ModelID]models.Model
 	devices   map[device.DeviceID]*device.Device
 }
 
@@ -63,6 +65,7 @@ func New(cfg Config) *Runtime {
 	return &Runtime{
 		config:  cfg,
 		sched:   scheduler.New(cfg.TickInterval),
+		models:  make(map[models.ModelID]models.Model),
 		devices: make(map[device.DeviceID]*device.Device),
 	}
 }
@@ -79,9 +82,53 @@ func NewFromFile(configPath string) (*Runtime, error) {
 // CreateDevice creates a new device and adds it to the runtime.
 func (r *Runtime) CreateDevice(id device.DeviceID, typeName string, memRegions map[string]uint32) *device.Device {
 	d := device.New(id, typeName, memRegions)
+	d.SetModelGetter(func(modelID models.ModelID) models.Model {
+		return r.Model(modelID)
+	})
 	r.devices[id] = d
 	r.sched.AddDevice(d)
 	return d
+}
+
+// CreateModel creates a new simulation model and adds it to the runtime.
+func (r *Runtime) CreateModel(m models.Model) {
+	r.models[m.ID()] = m
+	r.sched.AddModel(m)
+}
+
+// CreateGridModel creates a new Grid model.
+func (r *Runtime) CreateGridModel(id models.ModelID) *models.GridModel {
+	m := models.NewGridModel(id)
+	r.CreateModel(m)
+	return m
+}
+
+// CreateSunModel creates a new Sun model.
+func (r *Runtime) CreateSunModel(id models.ModelID) *models.SunModel {
+	m := models.NewSunModel(id)
+	r.CreateModel(m)
+	return m
+}
+
+// CreateWindModel creates a new Wind model.
+func (r *Runtime) CreateWindModel(id models.ModelID) *models.WindModel {
+	m := models.NewWindModel(id)
+	r.CreateModel(m)
+	return m
+}
+
+// CreateWeatherModel creates a new Weather model.
+func (r *Runtime) CreateWeatherModel(id models.ModelID) *models.WeatherModel {
+	m := models.NewWeatherModel(id)
+	r.CreateModel(m)
+	return m
+}
+
+// CreateReservoirModel creates a new Reservoir model.
+func (r *Runtime) CreateReservoirModel(id models.ModelID, area float32) *models.ReservoirModel {
+	m := models.NewReservoirModel(id, area)
+	r.CreateModel(m)
+	return m
 }
 
 // Device returns a device by ID.
@@ -94,6 +141,20 @@ func (r *Runtime) Devices() []*device.Device {
 	result := make([]*device.Device, 0, len(r.devices))
 	for _, d := range r.devices {
 		result = append(result, d)
+	}
+	return result
+}
+
+// Model returns a simulation model by ID.
+func (r *Runtime) Model(id models.ModelID) models.Model {
+	return r.models[id]
+}
+
+// Models returns all simulation models.
+func (r *Runtime) Models() []models.Model {
+	result := make([]models.Model, 0, len(r.models))
+	for _, m := range r.models {
+		result = append(result, m)
 	}
 	return result
 }

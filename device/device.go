@@ -4,19 +4,34 @@ package device
 
 import (
 	"github.com/tamzrod/forge/memory"
+	"github.com/tamzrod/forge/models"
 )
 
 // DeviceID is a unique identifier for a device.
 type DeviceID string
 
+// ModelProvider is an interface for providing access to simulation models.
+type ModelProvider interface {
+	// Model returns a simulation model by ID.
+	Model(id models.ModelID) models.Model
+}
+
 // Device represents a virtual industrial device.
 // A device owns its memory, behaviors, and protocols.
+// Devices observe simulation models through their behaviors.
 type Device struct {
-	id        DeviceID
-	typeName  string
-	mem       *memory.MemoryImage
-	behaviors []Behavior
-	running   bool
+	id          DeviceID
+	typeName    string
+	mem         *memory.MemoryImage
+	behaviors   []Behavior
+	modelGetter func(id models.ModelID) models.Model
+	running     bool
+}
+
+// SetModelGetter sets the function to retrieve simulation models.
+// This is typically set by the runtime when adding the device.
+func (d *Device) SetModelGetter(getter func(id models.ModelID) models.Model) {
+	d.modelGetter = getter
 }
 
 // New creates a new device with the given ID, type, and memory regions.
@@ -77,6 +92,15 @@ func (d *Device) Stop() {
 // Running returns true if the device is running.
 func (d *Device) Running() bool {
 	return d.running
+}
+
+// Model returns a simulation model by ID.
+// This allows behaviors to observe simulation models.
+func (d *Device) Model(id models.ModelID) models.Model {
+	if d.modelGetter == nil {
+		return nil
+	}
+	return d.modelGetter(id)
 }
 
 // State represents the lifecycle state of a device.
