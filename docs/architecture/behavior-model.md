@@ -2,7 +2,7 @@
 
 ## Philosophy
 
-**Behaviors are logic that reads and writes device memory.**
+**Behaviors are logic that reads and writes device memory, and observes infrastructure.**
 
 A device owns its behaviors. Behaviors may optionally publish to MMA2 via Raw Ingest.
 
@@ -10,24 +10,40 @@ A device owns its behaviors. Behaviors may optionally publish to MMA2 via Raw In
 
 A behavior:
 
-1. Reads from device memory
-2. Computes new values
-3. Writes to device memory
-4. Optionally publishes to MMA2 via Raw Ingest
-5. Never accesses other devices
-6. Never calls protocols
+1. Observes infrastructure (Sun, Grid, Wind, etc.)
+2. Reads from device memory
+3. Computes new values
+4. Writes to device memory
+5. Optionally publishes to MMA2 via Raw Ingest
+6. Never accesses other devices
+7. Never calls protocols
 
 ## Data Flow
 
 ```
-Behavior → Device Memory → Behavior
-           (reads)           (writes)
-               │
-               ▼
-         Raw Ingest
-               │
-               ▼
-             MMA2
+┌─────────────────┐
+│  Infrastructure │ (Grid, Sun, Wind)
+└────────┬────────┘
+         │ observes
+         ▼
+┌─────────────────┐
+│    Behavior     │
+└────────┬────────┘
+         │ reads/writes
+         ▼
+┌─────────────────┐
+│  Device Memory  │
+└────────┬────────┘
+         │ publishes
+         ▼
+┌─────────────────┐
+│   Raw Ingest    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│      MMA2       │
+└─────────────────┘
 ```
 
 ## Device Owns Behaviors
@@ -55,32 +71,43 @@ type Behavior interface {
     Detach()
     Tick()
 }
+
+// Device behavior has infrastructure reference
+type DeviceBehavior struct {
+    device       *Device
+    infrastructure *Infrastructure
+    rawIngest    RawIngestClient
+    unitID       uint16
+}
 ```
 
 ## Example: Weather Behavior
 
 ```go
 type WeatherBehavior struct {
-    device    *Device
-    rawIngest RawIngestClient
-    unitID    uint16
+    device         *Device
+    infrastructure *Infrastructure
+    rawIngest      RawIngestClient
+    unitID         uint16
 }
 
 func (b *WeatherBehavior) Tick() {
-    // Read from device memory (engineering values)
-    irradiance := b.device.Memory().ReadFloat32("sensors", irradianceAddr)
-    temperature := b.device.Memory().ReadFloat32("sensors", temperatureAddr)
+    // Observe infrastructure (shared simulated world)
+    irradiance := b.infrastructure.Sun().Irradiance()
+    temperature := b.infrastructure.Ambient().Temperature()
+    windSpeed := b.infrastructure.Wind().Speed()
     
-    // Compute (internal simulation logic)
-    // ...
+    // Add measurement noise (simulated sensor)
+    measured := b.addNoise(irradiance, temperature, windSpeed)
     
     // Write to device memory
-    b.device.Memory().WriteFloat32("computed", computedAddr, computedValue)
+    b.device.Memory().WriteFloat32("sensors", irradianceAddr, measured.irradiance)
+    b.device.Memory().WriteFloat32("sensors", temperatureAddr, measured.temperature)
+    b.device.Memory().WriteFloat32("sensors", windAddr, measured.windSpeed)
     
     // Device encodes: float32 → uint16 with scaling
-    // Device publishes via low-level Raw Ingest
-    b.rawIngest.WriteInputRegisters(b.unitID, 0, encodeFloat32(irradiance, 0, 2000))
-    b.rawIngest.WriteInputRegisters(b.unitID, 2, encodeFloat32(temperature, -50, 50))
+    b.rawIngest.WriteInputRegisters(b.unitID, 0, encodeFloat32(measured.irradiance, 0, 2000))
+    b.rawIngest.WriteInputRegisters(b.unitID, 2, encodeFloat32(measured.temperature, -50, 50))
 }
 ```
 
@@ -88,16 +115,19 @@ func (b *WeatherBehavior) Tick() {
 
 ```go
 type PVModelBehavior struct {
-    device    *Device
-    rawIngest RawIngestClient
-    unitID    uint16
+    device         *Device
+    infrastructure *Infrastructure
+    rawIngest      RawIngestClient
+    unitID         uint16
 }
 
 func (b *PVModelBehavior) Tick() {
-    irradiance := b.device.Memory().ReadFloat32("input", irradianceAddr)
-    temperature := b.device.Memory().ReadFloat32("input", temperatureAddr)
+    // Observe infrastructure (not device memory)
+    irradiance := b.infrastructure.Sun().Irradiance()
+    temperature := b.infrastructure.Ambient().Temperature()
     
-    dcPower := irradiance * b.scaleFactor * (1 - 0.004*(temperature-25))
+    // Compute DC power from sun
+    dcPower := b.calculatePower(irradiance, temperature)
     
     // Write to device memory
     b.device.Memory().WriteFloat32("output", powerAddr, dcPower)
@@ -117,14 +147,21 @@ func encodeFloat32(value float32, min, max float32) []byte {
 
 **Note:** Encoding and scaling are device responsibilities. The behavior owns the engineering semantics.
 
-## No Cross-Device Access
+## Infrastructure Observation Pattern
 
-Behaviors cannot access other devices:
+Behaviors observe infrastructure, not other devices:
 
 ```go
-// This does not exist
-func (b *Behavior) AccessOther(other *Device) {
-    other.Memory().Write(...)  // Not possible
+// Correct: Observe infrastructure
+func (b *PVBehavior) Tick() {
+    irradiance := b.infrastructure.Sun().Irradiance()
+}
+
+// Incorrect: Access other device
+func (b *BadBehavior) Tick() {
+    // This does not exist
+    meter := b.runtime.Device("meter-001")
+    meter.Memory().Read(...)  // Not possible
 }
 ```
 
@@ -132,10 +169,10 @@ func (b *Behavior) AccessOther(other *Device) {
 
 Behaviors are deterministic:
 
-- Same memory → same results
+- Same infrastructure state → same device behavior
 - No randomness without seeded RNG
 - No external system calls (except Raw Ingest publish)
-- No time-of-day dependencies
+- No time-of-day dependencies (use simulation clock)
 
 ## Raw Ingest Publishing
 

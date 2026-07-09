@@ -2,9 +2,9 @@
 
 ## Architectural Philosophy
 
-**The devices are the system. The runtime only hosts them.**
+**The devices are the system. Infrastructure is the world they inhabit. The runtime hosts both.**
 
-This architecture describes an ecosystem of virtual industrial devices. Every design decision reinforces a single principle:
+This architecture describes an ecosystem of virtual industrial devices within a simulated world. Every design decision reinforces a single principle:
 
 **Memory is the source of truth.**
 
@@ -13,9 +13,10 @@ This architecture describes an ecosystem of virtual industrial devices. Every de
 1. **Devices own memory** - Every virtual device owns its memory image
 2. **Behaviors modify memory** - Logic reads from and writes to device memory
 3. **Protocols expose memory** - External systems read device memory through protocols
-4. **Devices never communicate directly** - Devices communicate only by reading and writing memory
-5. **Runtime provides infrastructure** - The runtime only hosts, schedules, and coordinates
-6. **Plugins provide domain knowledge** - New domains add device types, not runtime changes
+4. **Devices never communicate directly** - Devices observe infrastructure and publish results
+5. **Infrastructure represents the shared world** - Grid, Sun, Wind, Environment
+6. **Runtime provides infrastructure** - The runtime hosts, schedules, and coordinates
+7. **Plugins provide domain knowledge** - New domains add device types and infrastructure, not runtime changes
 
 ### Why Memory as Foundation
 
@@ -72,31 +73,26 @@ Energy is only one possible plugin domain.
 │  Scheduler / Simulation Clock / Plugin Loader                  │
 └─────────────────────────────────────────────────────────────────┘
                             │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  Simulation Infrastructure                        │
+│                                                               │
+│  Grid │ Sun │ Wind │ Ambient Temperature │ Geography            │
+│                                                               │
+│  Shared world - no protocols - observed by devices            │
+└─────────────────────────────────────────────────────────────────┘
                             │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-        ▼                   ▼                   ▼
-┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-│ Revenue Meter │   │Weather Station│   │    Relay     │
-│               │   │               │   │               │
-│ ┌───────────┐ │   │ ┌───────────┐ │   │ ┌───────────┐│
-│ │  Memory   │ │   │ │  Memory   │ │   │ │  Memory   ││
-│ │           │ │   │ │           │ │   │ │           ││
-│ │  (core)   │ │   │ │  (core)   │ │   │ │  (core)   ││
-│ └───────────┘ │   │ └───────────┘ │   │ └───────────┘│
-│               │   │               │   │               │
-│ ┌───────────┐ │   │ ┌───────────┐ │   │ ┌───────────┐│
-│ │ Behaviors │ │   │ │ Behaviors │ │   │ │ Behaviors ││
-│ └───────────┘ │   │ └───────────┘ │   │ └───────────┘│
-│               │   │               │   │               │
-│ ┌───────────┐ │   │ ┌───────────┐ │   │ ┌───────────┐│
-│ │ Protocols │ │   │ │ Protocols │ │   │ │ Protocols ││
-│ │(external) │ │   │ │(external) │ │   │ │(external) ││
-│ └───────────┘ │   │ └───────────┘ │   │ └───────────┘│
-└───────────────┘   └───────────────┘   └───────────────┘
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       Virtual Devices                             │
+│                                                               │
+│  Revenue Meter │ Weather Station │ PV Inverter │ Relay         │
+│                                                               │
+│  Observe infrastructure, publish to MMA2                       │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-Memory is the core of each device. Protocols are external views attached to devices.
+Three layers: Runtime → Infrastructure → Devices
 
 ---
 
@@ -113,24 +109,40 @@ Every virtual device owns:
 
 ---
 
-## Device Types (from plugins)
+## Plugin Types (from plugins)
+
+Plugins provide both **Infrastructure** and **Devices**:
 
 ```
 Energy Plugin
-├── Revenue Meter
+
+Infrastructure:
+├── Grid
+├── Sun
+├── Wind
+└── Ambient Temperature
+
+Devices:
 ├── Weather Station
 ├── PV Inverter
-├── Relay
-└── Grid
+├── Revenue Meter
+└── Relay
 
 Water Plugin
+
+Infrastructure:
+├── Reservoir
+├── River
+└── Ambient Temperature
+
+Devices:
 ├── Pump
 ├── Valve
 ├── Tank
 └── Flow Meter
 ```
 
-Adding a new domain requires only adding new device types through plugins. The runtime never changes.
+Infrastructure provides the shared world. Devices observe infrastructure and publish to MMA2.
 
 ---
 
@@ -149,13 +161,14 @@ Adding a new domain requires only adding new device types through plugins. The r
 
 | Document | Description |
 |----------|-------------|
-| [Runtime](runtime.md) | Infrastructure that hosts devices |
+| [Runtime](runtime.md) | Hosts infrastructure and devices |
+| [Infrastructure Model](infrastructure-model.md) | Shared simulated world |
 | [Device Model](device-model.md) | Virtual device structure |
 | [Memory Model](memory-model.md) | Device memory ownership |
 | [Behavior Model](behavior-model.md) | Device-owned logic |
 | [Protocol Architecture](protocol-architecture.md) | External memory views |
 | [Scheduler](scheduler.md) | Time advancement |
-| [Plugin Architecture](plugin-architecture.md) | Device type contribution |
+| [Plugin Architecture](plugin-architecture.md) | Domain contribution |
 | [Fault Model](fault-model.md) | Memory behavior modification |
 | [Scenario Engine](scenario-engine.md) | Event injection |
 | [Execution Model](execution-model.md) | End-to-end flow |
