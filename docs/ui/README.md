@@ -30,6 +30,7 @@ See [Design Language](DESIGN_LANGUAGE.md) for detailed philosophy.
 
 | Document | Purpose |
 |----------|---------|
+| [Workspaces](WORKSPACES.md) | Functional areas and workspace hierarchy |
 | [Design Language](DESIGN_LANGUAGE.md) | Overall design philosophy and principles |
 | [Layout](LAYOUT.md) | Application layout, panels, and navigation |
 | [Colors](COLORS.md) | Semantic color system |
