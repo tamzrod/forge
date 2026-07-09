@@ -16,8 +16,29 @@ The architecture was refined through multiple iterations until it satisfied thes
 4. **Runtime-minimal** - Infrastructure only, no business logic
 5. **Deterministic** - Reproducible execution
 6. **Extensible** - New domains through plugins, no runtime changes
+7. **MMA2 Integration** - Clear separation between simulation and plant integration
 
 The architecture is now considered a contract for implementation.
+
+## Two Memory Domains
+
+There are TWO distinct memory domains. These must never be confused.
+
+### Domain 1: Device Memory
+
+- **Owned by**: Each virtual device
+- **Scope**: Private, internal
+- **Access**: Device behaviors only
+- **Purpose**: Internal device state and simulation logic
+
+### Domain 2: Operational Memory (MMA2)
+
+- **Owned by**: MMA2 appliance
+- **Scope**: Shared, visible to all
+- **Access**: Atlas-PPC, SCADA, HMIs, Historians
+- **Purpose**: Plant-wide operational state
+
+**Device Memory is NOT MMA2. MMA2 is NOT Device Memory.**
 
 ## Architectural Laws
 
@@ -26,59 +47,66 @@ These principles are no longer under discussion.
 ### 1. Device Definition
 
 A virtual industrial device is fundamentally:
-- Deterministic memory
+- Deterministic memory (private, internal)
 - Executable behaviors
-- Protocol interfaces
+- Raw Ingest publisher (to MMA2)
 
-### 2. Memory as Source of Truth
+### 2. Device Memory is Source of Truth
 
-Memory is the single source of truth. There is no state outside memory.
+Device memory is the single source of truth within the simulation. There is no state outside device memory.
 
-### 3. Behaviors Modify Memory
+### 3. MMA2 is Operational Memory
 
-Behaviors read from and write to device memory. Behaviors never own state.
+MMA2 owns the shared operational memory. The simulation runtime publishes to MMA2 via Raw Ingest.
 
-### 4. Protocols Expose Memory
+### 4. Behaviors Modify Device Memory
 
-Protocols expose device memory to external systems. Protocols never own state.
+Behaviors read from and write to device memory. Behaviors may publish to MMA2 via Raw Ingest.
 
-### 5. Protocols Never Own State
+### 5. Raw Ingest is the Integration Point
 
-Protocols are external views. They never cache, synchronize, or maintain state.
+The simulation runtime publishes data to MMA2 via Raw Ingest. The runtime does NOT expose protocols.
 
-### 6. Devices Never Communicate Directly
+### 6. MMA2 Exposes Protocols
+
+MMA2 owns operational memory and exposes protocols (Modbus, DNP3, REST, MQTT).
+
+### 7. Devices Never Communicate Directly
 
 Devices communicate only by reading and writing memory. There are no direct device references, message buses, callbacks, or service calls between devices.
 
-### 7. Runtime Provides Infrastructure
+### 8. Runtime Provides Infrastructure
 
-The runtime hosts devices. It provides scheduling, time advancement, and plugin loading. It contains no business logic.
+The runtime hosts devices. It provides scheduling, time advancement, plugin loading, and Raw Ingest connection. It contains no business logic.
 
-### 8. Plugins Provide Domain Knowledge
+### 9. Plugins Provide Domain Knowledge
 
 Plugins provide device types. The runtime remains domain-independent. New domains require no runtime changes.
 
 ## Ownership Rules
 
 ```
-Device owns:
-├── Memory Image
-├── Behaviors
-├── Protocols
-└── Faults
-
-Runtime owns:
+Simulation Runtime owns:
 ├── Scheduler
 ├── Simulation Clock
 ├── Device Registry
-└── Plugin Loader
+├── Plugin Loader
+└── Raw Ingest Publisher
+
+Device owns:
+├── Device Memory (private)
+├── Behaviors
+└── Faults
+
+MMA2 owns:
+├── Operational Memory (shared)
+└── Protocols (Modbus, DNP3, REST, MQTT)
 ```
 
 ### What Devices Own
 
-- Memory
+- Device Memory (private, internal)
 - Behaviors
-- Protocols
 - Faults
 
 ### What Devices Do Not Own
@@ -86,6 +114,8 @@ Runtime owns:
 - Scheduling
 - Time management
 - Plugin loading
+- Operational memory
+- Protocols
 
 ### What the Runtime Owns
 
@@ -93,13 +123,26 @@ Runtime owns:
 - Time advancement
 - Device lifecycle
 - Plugin loading
+- Raw Ingest connection
 
 ### What the Runtime Does Not Own
 
-- Memory
+- Device Memory
 - Behaviors
+- Operational memory
 - Protocols
 - Domain logic
+
+### What MMA2 Owns
+
+- Operational Memory
+- Protocols (Modbus, DNP3, REST, MQTT)
+
+### What MMA2 Does Not Own
+
+- Device Memory
+- Behaviors
+- Simulation logic
 
 ## When Architecture May Be Revisited
 
@@ -136,11 +179,13 @@ Only genuine architectural limitations justify revisiting the architecture.
 
 Priority order:
 
-1. **Implement one complete device** - A working revenue meter with behaviors and protocols
-2. **Validate execution model** - Does the tick loop work as specified?
-3. **Validate protocol adapters** - Can Modbus TCP expose device memory?
-4. **Measure performance** - What are actual tick times?
-5. **Improve implementation** - Refactor based on working code
+1. **Implement Weather Device** - Device with weather behavior, publishes to MMA2 via Raw Ingest
+2. **Validate Raw Ingest integration** - Can simulation publish to MMA2?
+3. **Validate execution model** - Does the tick loop work as specified?
+4. **Implement PV Device** - Device with PV model behavior, publishes to MMA2
+5. **Measure performance** - What are actual tick times?
+
+**Important**: Do NOT implement Modbus servers inside the simulation. The simulation publishes to MMA2. MMA2 exposes protocols.
 
 Avoid architecture discussions unless implementation demonstrates a real problem.
 
