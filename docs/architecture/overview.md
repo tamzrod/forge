@@ -12,6 +12,23 @@ See [Vision](vision.md) for the complete vision statement.
 
 ---
 
+## Terminology
+
+**This project has precise, authoritative terminology.**
+
+See the **[Architecture Glossary](GLOSSARY.md)** for definitions of all major concepts.
+
+Key terms used in this document:
+
+| Term | Definition |
+|------|------------|
+| **Simulation Model** | Represents physical world (Grid, Sun, Weather) |
+| **Virtual Firmware** | Samples models, owns Device Memory |
+| **Device Memory** | Internal RAM owned by firmware |
+| **Communication Interface** | Serializes Device Memory |
+
+---
+
 ## Architectural Philosophy
 
 **The devices are the system. Simulation Models represent the physical world. The runtime hosts both.**
@@ -236,6 +253,7 @@ These may inspire future plugins but are not the mission of the Runtime.
 
 | Document | Description |
 |----------|-------------|
+| [Glossary](GLOSSARY.md) | **Authoritative terminology** |
 | [Vision](vision.md) | Project purpose, audience, and philosophy |
 | [Runtime](runtime.md) | Hosts models and devices |
 | [Simulation Models](simulation-models.md) | Physical world representation |
