@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/tamzrod/forge/internal/devices"
+	"github.com/tamzrod/forge/internal/devices/weatherstation"
 	"github.com/tamzrod/forge/internal/models/clock"
 	"github.com/tamzrod/forge/internal/models/grid"
 	"github.com/tamzrod/forge/internal/models/sun"
@@ -126,12 +127,27 @@ func (v *View) DevicesState() DevicesState {
 
 	deviceStates := make([]DeviceState, 0)
 	for _, d := range v.registry.Devices() {
-		deviceStates = append(deviceStates, DeviceState{
-			ID:   string(d.ID()),
-			Type: string(d.Type()),
-			Name: d.Name(),
+		state := DeviceState{
+			ID:    string(d.ID()),
+			Type:  string(d.Type()),
+			Name:  d.Name(),
 			State: d.State().String(),
-		})
+		}
+
+		// Check if this is a Weather Station with publishing
+		if ws, ok := d.(*weatherstation.Station); ok {
+			state.PublishingEnabled = true
+			pubState := ws.PublishingState()
+			state.Publishing = &PublishingInfo{
+				Enabled:     pubState.Enabled,
+				Connected:  pubState.Connected,
+				PacketsSent: pubState.PacketsSent,
+				Errors:     pubState.Errors,
+				LastError:  pubState.LastError,
+			}
+		}
+
+		deviceStates = append(deviceStates, state)
 	}
 
 	return DevicesState{
@@ -148,10 +164,20 @@ type DevicesState struct {
 
 // DeviceState represents a single device's state.
 type DeviceState struct {
-	ID    string `json:"id"`
-	Type  string `json:"type"`
-	Name  string `json:"name"`
-	State string `json:"state"`
+	ID       string         `json:"id"`
+	Type     string         `json:"type"`
+	Name     string         `json:"name"`
+	State    string         `json:"state"`
+	Publishing *PublishingInfo `json:"publishing,omitempty"`
+}
+
+// PublishingInfo represents Raw Ingest publishing status.
+type PublishingInfo struct {
+	Enabled     bool   `json:"enabled"`
+	Connected  bool   `json:"connected"`
+	PacketsSent uint64 `json:"packets_sent"`
+	Errors      uint64 `json:"errors"`
+	LastError  string `json:"last_error,omitempty"`
 }
 
 // ClockState represents the simulation clock state.

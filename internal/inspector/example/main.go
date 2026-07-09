@@ -41,8 +41,15 @@ func main() {
 	// Create device registry
 	registry := devices.NewRegistry()
 
-	// Create Weather Station device
-	ws, err := weatherstation.NewStation(weatherstation.DefaultConfig(), simContext)
+	// Create Weather Station device with publishing enabled
+	cfg := weatherstation.DefaultConfig()
+	cfg.Publishing.Enabled = true
+	cfg.Publishing.Host = "localhost"
+	cfg.Publishing.Port = 500
+	cfg.Publishing.UnitID = 1
+	cfg.Publishing.Interval = 1 * time.Second
+
+	ws, err := weatherstation.NewStation(cfg, simContext)
 	if err != nil {
 		log.Fatalf("Failed to create Weather Station: %v", err)
 	}
@@ -97,6 +104,9 @@ func main() {
 	log.Println()
 	log.Println("The Weather Station observes the Weather Model")
 	log.Println("and copies values to its operational memory.")
+	log.Println()
+	log.Println("Publishing: Enabled (Raw Ingest)")
+	log.Println("Target: localhost:500, UnitID: 1")
 	log.Println()
 
 	ticker := time.NewTicker(100 * time.Millisecond)

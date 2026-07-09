@@ -1,6 +1,8 @@
 package weatherstation
 
 import (
+	"time"
+
 	"github.com/tamzrod/forge/internal/devices"
 )
 
@@ -15,6 +17,18 @@ type Config struct {
 
 	// Memory configuration
 	RegisterBase uint16
+
+	// Publishing configuration
+	Publishing PublishingConfig
+}
+
+// PublishingConfig holds Raw Ingest publishing settings.
+type PublishingConfig struct {
+	Enabled     bool
+	Host       string
+	Port       uint16
+	UnitID     uint8
+	Interval   time.Duration
 }
 
 // TemperatureUnit specifies the temperature unit.
@@ -32,6 +46,13 @@ func DefaultConfig() Config {
 		Name: "Weather Station 001",
 		Units: Celsius,
 		RegisterBase: 0,
+		Publishing: PublishingConfig{
+			Enabled:   false,
+			Host:     "localhost",
+			Port:     500,
+			UnitID:   1,
+			Interval: 1 * time.Second,
+		},
 	}
 }
 

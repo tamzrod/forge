@@ -3,8 +3,10 @@ package weatherstation
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/tamzrod/forge/internal/devices"
+	"github.com/tamzrod/forge/internal/publishers/rawingest"
 )
 
 // Type is the device type identifier.
@@ -16,16 +18,18 @@ const Type = devices.DeviceType("weather_station")
 // operational memory representing what it would report externally.
 //
 // Architecture:
-//   Weather Model → Weather Station → Operational Memory → Protocols (future)
+//   Weather Model → Weather Station → Operational Memory → Raw Ingest → MMA2
 type Station struct {
 	*devices.BaseDevice
 
-	config  Config
-	ctx     *devices.Context
-	memory  *devices.Memory
+	config   Config
+	ctx      *devices.Context
+	memory   *devices.Memory
+	publisher *rawingest.Publisher
 
 	mu        sync.RWMutex
 	tickCount uint64
+	lastPublish time.Time
 }
 
 // NewStation creates a new Weather Station device.
@@ -34,12 +38,30 @@ func NewStation(cfg Config, ctx *devices.Context) (*Station, error) {
 		return nil, err
 	}
 
-	return &Station{
+	station := &Station{
 		BaseDevice: devices.NewBaseDevice(cfg.ID, Type, cfg.Name),
 		config:     cfg,
 		ctx:        ctx,
 		memory:     devices.NewMemory(),
-	}, nil
+	}
+
+	// Create publisher if enabled
+	if cfg.Publishing.Enabled {
+		pubCfg := rawingest.Config{
+			Host:     cfg.Publishing.Host,
+			Port:     cfg.Publishing.Port,
+			UnitID:   cfg.Publishing.UnitID,
+			Enabled:  true,
+			Interval: cfg.Publishing.Interval,
+		}
+		publisher, err := rawingest.NewPublisher(pubCfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create publisher: %w", err)
+		}
+		station.publisher = publisher
+	}
+
+	return station, nil
 }
 
 // Initialize prepares the Weather Station for operation.
@@ -59,12 +81,19 @@ func (s *Station) Initialize() error {
 	s.memory.Set(MemoryStatus, 1.0) // 1 = OK
 	s.memory.Set(MemoryTickCount, 0.0)
 
+	// Start publisher if configured
+	if s.publisher != nil {
+		if err := s.publisher.Start(); err != nil {
+			return fmt.Errorf("failed to start publisher: %w", err)
+		}
+	}
+
 	s.setState(devices.StateInitialized)
 	return nil
 }
 
 // Tick updates the Weather Station's operational memory by observing
-// the Weather Model.
+// the Weather Model, then publishes to MMA2.
 func (s *Station) Tick() {
 	if s.State() != devices.StateInitialized && s.State() != devices.StateRunning {
 		return
@@ -97,6 +126,26 @@ func (s *Station) Tick() {
 	s.memory.Set(MemoryTickCount, float64(s.tickCount))
 
 	s.mu.Unlock()
+
+	// Publish operational memory
+	s.publish()
+}
+
+// publish sends current memory values to MMA2.
+func (s *Station) publish() {
+	if s.publisher == nil {
+		return
+	}
+
+	values := s.memory.Values()
+	if err := s.publisher.Publish(values); err != nil {
+		// Publishing failure is logged but doesn't stop the device
+		return
+	}
+
+	s.mu.Lock()
+	s.lastPublish = time.Now()
+	s.mu.Unlock()
 }
 
 // convertTemperature converts temperature to the configured unit.
@@ -112,6 +161,11 @@ func (s *Station) convertTemperature(celsius float64) float64 {
 // Shutdown stops the Weather Station.
 func (s *Station) Shutdown() error {
 	s.setState(devices.StateStopped)
+
+	if s.publisher != nil {
+		s.publisher.Stop()
+	}
+
 	s.memory.Reset()
 	return nil
 }
@@ -119,6 +173,11 @@ func (s *Station) Shutdown() error {
 // Memory returns the device's operational memory.
 func (s *Station) Memory() *devices.Memory {
 	return s.memory
+}
+
+// Publisher returns the Raw Ingest publisher.
+func (s *Station) Publisher() *rawingest.Publisher {
+	return s.publisher
 }
 
 // Temperature returns the current temperature measurement.
@@ -158,38 +217,73 @@ func (s *Station) TickCount() uint64 {
 	return s.tickCount
 }
 
+// PublishingState returns the publishing status.
+func (s *Station) PublishingState() PublishingState {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	state := PublishingState{
+		Enabled:     s.publisher != nil,
+		LastPublish: s.lastPublish,
+	}
+
+	if s.publisher != nil {
+		state.Connected = s.publisher.IsConnected()
+		state.PacketsSent = s.publisher.Stats().PacketsSent
+		state.Errors = s.publisher.Stats().Errors
+		state.LastError = s.publisher.Stats().LastError
+	}
+
+	return state
+}
+
 // State returns a snapshot of all measurements.
 func (s *Station) State() WeatherStationState {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	pubState := s.PublishingState()
+
 	return WeatherStationState{
-		ID:             s.ID(),
-		Name:           s.Name(),
-		Type:           s.Type(),
-		DeviceState:    s.BaseDevice.State(),
-		Temperature:    s.memory.GetOrDefault(MemoryTemperature, 0),
-		Humidity:       s.memory.GetOrDefault(MemoryHumidity, 0),
-		Pressure:       s.memory.GetOrDefault(MemoryPressure, 0),
-		CloudCover:     s.memory.GetOrDefault(MemoryCloudCover, 0),
-		WindSpeed:      s.memory.GetOrDefault(MemoryWindSpeed, 0),
-		WindDirection:  s.memory.GetOrDefault(MemoryWindDirection, 0),
+		ID:              s.ID(),
+		Name:            s.Name(),
+		Type:            s.Type(),
+		DeviceState:     s.BaseDevice.State(),
+		Temperature:     s.memory.GetOrDefault(MemoryTemperature, 0),
+		Humidity:        s.memory.GetOrDefault(MemoryHumidity, 0),
+		Pressure:        s.memory.GetOrDefault(MemoryPressure, 0),
+		CloudCover:      s.memory.GetOrDefault(MemoryCloudCover, 0),
+		WindSpeed:       s.memory.GetOrDefault(MemoryWindSpeed, 0),
+		WindDirection:   s.memory.GetOrDefault(MemoryWindDirection, 0),
 		RainStatus:      s.memory.GetOrDefault(MemoryRainStatus, 0) == 1.0,
-		TickCount:      s.tickCount,
+		TickCount:       s.tickCount,
+		PublishingState: pubState,
 	}
+}
+
+// PublishingState represents the Raw Ingest publishing status.
+type PublishingState struct {
+	Enabled     bool      `json:"enabled"`
+	Connected   bool      `json:"connected"`
+	PacketsSent uint64    `json:"packets_sent"`
+	Errors      uint64    `json:"errors"`
+	LastPublish time.Time `json:"last_publish"`
+	LastError   string    `json:"last_error,omitempty"`
 }
 
 // WeatherStationState represents the current state of the Weather Station.
 type WeatherStationState struct {
-	ID             devices.DeviceID     `json:"id"`
-	Name           string               `json:"name"`
-	Type           devices.DeviceType   `json:"type"`
-	DeviceState    devices.State        `json:"device_state"`
-	Temperature    float64              `json:"temperature"`
-	Humidity       float64             `json:"humidity"`
-	Pressure       float64             `json:"pressure"`
-	CloudCover     float64             `json:"cloud_cover"`
-	WindSpeed      float64             `json:"wind_speed"`
-	WindDirection  float64             `json:"wind_direction"`
-	RainStatus     bool                `json:"rain_status"`
-	TickCount      uint64              `json:"tick_count"`
+	ID              devices.DeviceID     `json:"id"`
+	Name            string               `json:"name"`
+	Type            devices.DeviceType   `json:"type"`
+	DeviceState     devices.State        `json:"device_state"`
+	Temperature     float64              `json:"temperature"`
+	Humidity        float64             `json:"humidity"`
+	Pressure        float64             `json:"pressure"`
+	CloudCover      float64             `json:"cloud_cover"`
+	WindSpeed       float64             `json:"wind_speed"`
+	WindDirection   float64             `json:"wind_direction"`
+	RainStatus      bool                `json:"rain_status"`
+	TickCount       uint64              `json:"tick_count"`
+	PublishingState PublishingState     `json:"publishing_state"`
 }

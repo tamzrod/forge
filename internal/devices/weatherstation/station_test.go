@@ -23,6 +23,7 @@ func testContext() (*devices.Context, *weather.Weather) {
 func TestNewStation(t *testing.T) {
 	ctx, _ := testContext()
 	cfg := DefaultConfig()
+	cfg.Publishing.Enabled = false // Disable publishing for tests
 
 	station, err := NewStation(cfg, ctx)
 	if err != nil {
@@ -56,7 +57,10 @@ func TestNewStation_InvalidID(t *testing.T) {
 
 func TestStation_Initialize(t *testing.T) {
 	ctx, _ := testContext()
-	station, _ := NewStation(DefaultConfig(), ctx)
+	cfg := DefaultConfig()
+	cfg.Publishing.Enabled = false
+
+	station, _ := NewStation(cfg, ctx)
 
 	if err := station.Initialize(); err != nil {
 		t.Fatalf("failed to initialize: %v", err)
@@ -73,8 +77,11 @@ func TestStation_Initialize(t *testing.T) {
 }
 
 func TestStation_Tick(t *testing.T) {
-	ctx, weatherModel := testContext()
-	station, _ := NewStation(DefaultConfig(), ctx)
+	ctx, _ := testContext()
+	cfg := DefaultConfig()
+	cfg.Publishing.Enabled = false
+
+	station, _ := NewStation(cfg, ctx)
 
 	station.Initialize()
 
@@ -94,7 +101,10 @@ func TestStation_Tick(t *testing.T) {
 
 func TestStation_Shutdown(t *testing.T) {
 	ctx, _ := testContext()
-	station, _ := NewStation(DefaultConfig(), ctx)
+	cfg := DefaultConfig()
+	cfg.Publishing.Enabled = false
+
+	station, _ := NewStation(cfg, ctx)
 
 	station.Initialize()
 	station.Tick()
@@ -110,7 +120,10 @@ func TestStation_Shutdown(t *testing.T) {
 
 func TestStation_Memory(t *testing.T) {
 	ctx, _ := testContext()
-	station, _ := NewStation(DefaultConfig(), ctx)
+	cfg := DefaultConfig()
+	cfg.Publishing.Enabled = false
+
+	station, _ := NewStation(cfg, ctx)
 
 	mem := station.Memory()
 	if mem == nil {
@@ -119,13 +132,16 @@ func TestStation_Memory(t *testing.T) {
 }
 
 func TestStation_TemperatureConversion(t *testing.T) {
-	ctx, weatherModel := testContext()
+	ctx, _ := testContext()
 	
 	// Create station with Fahrenheit units
 	cfg := Config{
 		ID:   "station-001",
 		Name: "Test Station",
 		Units: Fahrenheit,
+		Publishing: PublishingConfig{
+			Enabled: false,
+		},
 	}
 	
 	station, _ := NewStation(cfg, ctx)
@@ -144,7 +160,10 @@ func TestStation_TemperatureConversion(t *testing.T) {
 
 func TestStation_TickCount(t *testing.T) {
 	ctx, _ := testContext()
-	station, _ := NewStation(DefaultConfig(), ctx)
+	cfg := DefaultConfig()
+	cfg.Publishing.Enabled = false
+
+	station, _ := NewStation(cfg, ctx)
 
 	if station.TickCount() != 0 {
 		t.Error("expected initial tick count 0")
@@ -165,7 +184,10 @@ func TestStation_TickCount(t *testing.T) {
 
 func TestStation_State(t *testing.T) {
 	ctx, _ := testContext()
-	station, _ := NewStation(DefaultConfig(), ctx)
+	cfg := DefaultConfig()
+	cfg.Publishing.Enabled = false
+
+	station, _ := NewStation(cfg, ctx)
 
 	station.Initialize()
 	station.Tick()
@@ -186,5 +208,34 @@ func TestStation_State(t *testing.T) {
 
 	if state.TickCount != 1 {
 		t.Errorf("expected tick count 1, got %d", state.TickCount)
+	}
+}
+
+func TestStation_PublishingState(t *testing.T) {
+	ctx, _ := testContext()
+	cfg := DefaultConfig()
+	cfg.Publishing.Enabled = false
+
+	station, _ := NewStation(cfg, ctx)
+
+	pubState := station.PublishingState()
+	if pubState.Enabled {
+		t.Error("expected publishing to be disabled")
+	}
+}
+
+func TestStation_PublishWithoutPublisher(t *testing.T) {
+	ctx, _ := testContext()
+	cfg := DefaultConfig()
+	cfg.Publishing.Enabled = false
+
+	station, _ := NewStation(cfg, ctx)
+	station.Initialize()
+
+	// Should not panic even without publisher
+	station.Tick()
+
+	if station.State() != devices.StateRunning {
+		t.Errorf("expected state Running, got %s", station.State())
 	}
 }

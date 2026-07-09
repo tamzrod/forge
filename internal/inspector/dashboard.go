@@ -260,6 +260,27 @@ const dashboardHTML = `<!DOCTYPE html>
                 </div>
             </div>
         </div>
+
+        <!-- Publishing Card -->
+        <div class="card">
+            <h2>Raw Ingest Publishing</h2>
+            <div class="metric">
+                <span class="label">Status</span>
+                <span class="value" id="publishStatus">--</span>
+            </div>
+            <div class="metric">
+                <span class="label">Packets Sent</span>
+                <span class="value" id="packetsSent">0</span>
+            </div>
+            <div class="metric">
+                <span class="label">Errors</span>
+                <span class="value" id="publishErrors">0</span>
+            </div>
+            <div class="metric" id="publishErrorRow" style="display: none;">
+                <span class="label">Last Error</span>
+                <span class="value" id="lastError" style="color: #ff4444;">--</span>
+            </div>
+        </div>
     </div>
 
     <div class="footer">
@@ -392,6 +413,10 @@ const dashboardHTML = `<!DOCTYPE html>
             document.getElementById('deviceCount').textContent = state.devices.count;
             
             const deviceList = document.getElementById('deviceList');
+            let totalPacketsSent = 0;
+            let totalErrors = 0;
+            let hasPublishing = false;
+            
             if (state.devices.devices && state.devices.devices.length > 0) {
                 let html = '';
                 for (const device of state.devices.devices) {
@@ -400,10 +425,48 @@ const dashboardHTML = `<!DOCTYPE html>
                     html += '<span class="label">' + escapeHtml(device.name) + '</span>';
                     html += '<span class="value"><span class="status-indicator ' + statusClass + '"></span>' + escapeHtml(device.type) + '</span>';
                     html += '</div>';
+                    
+                    // Check for publishing info
+                    if (device.publishing && device.publishing.enabled) {
+                        hasPublishing = true;
+                        totalPacketsSent += device.publishing.packets_sent || 0;
+                        totalErrors += device.publishing.errors || 0;
+                    }
                 }
                 deviceList.innerHTML = html;
             } else {
                 deviceList.innerHTML = '<div class="metric" style="color: #666; font-style: italic;">No devices registered</div>';
+            }
+            
+            // Publishing status
+            const publishStatus = document.getElementById('publishStatus');
+            const packetsSent = document.getElementById('packetsSent');
+            const publishErrors = document.getElementById('publishErrors');
+            const publishErrorRow = document.getElementById('publishErrorRow');
+            const lastError = document.getElementById('lastError');
+            
+            if (!hasPublishing) {
+                publishStatus.textContent = 'Disabled';
+                publishStatus.className = 'value';
+                packetsSent.textContent = '0';
+                publishErrors.textContent = '0';
+                publishErrorRow.style.display = 'none';
+            } else {
+                // Find first device with publishing
+                const publishingDevice = state.devices.devices.find(d => d.publishing && d.publishing.enabled);
+                if (publishingDevice && publishingDevice.publishing) {
+                    publishStatus.textContent = publishingDevice.publishing.connected ? 'Connected' : 'Disconnected';
+                    publishStatus.className = 'value ' + (publishingDevice.publishing.connected ? 'good' : 'bad');
+                    packetsSent.textContent = publishingDevice.publishing.packets_sent.toLocaleString();
+                    publishErrors.textContent = publishingDevice.publishing.errors.toLocaleString();
+                    
+                    if (publishingDevice.publishing.last_error) {
+                        publishErrorRow.style.display = 'flex';
+                        lastError.textContent = publishingDevice.publishing.last_error;
+                    } else {
+                        publishErrorRow.style.display = 'none';
+                    }
+                }
             }
         }
 
