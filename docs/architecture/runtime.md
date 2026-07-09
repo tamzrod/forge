@@ -1,10 +1,14 @@
 # Runtime
 
+## Purpose
+
+The runtime hosts the Virtual Industrial Laboratory. It provides scheduling, model management, device management, and Raw Ingest publishing.
+
+The runtime contains no domain knowledge—all industrial specifics live in plugins.
+
 ## Philosophy
 
 **The runtime hosts simulation models and devices. That's all.**
-
-The runtime provides common infrastructure. It contains no domain knowledge.
 
 ## Runtime Responsibilities
 
@@ -12,7 +16,7 @@ The runtime provides:
 
 | Component | Purpose |
 |-----------|---------|
-| **Scheduler** | Advances simulation time |
+| **Scheduler** | Advances simulation time deterministically |
 | **Simulation Clock** | Tracks elapsed time |
 | **Model Registry** | Holds simulation models |
 | **Device Registry** | Holds loaded devices |
@@ -20,7 +24,7 @@ The runtime provides:
 | **Raw Ingest Publisher** | Publishes to MMA2 |
 | **Configuration** | Provides settings |
 
-That's the entire runtime.
+That's the entire runtime—small enough to be easily understood and maintained.
 
 ## What the Runtime Does Not Do
 

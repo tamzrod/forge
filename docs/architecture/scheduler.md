@@ -2,7 +2,7 @@
 
 ## Role
 
-The scheduler advances simulation time. It tells devices to tick.
+The scheduler advances simulation time deterministically. It tells models and devices to tick.
 
 ## Tick Model
 
@@ -11,12 +11,19 @@ Simulation Tick
       │
       ▼
 ┌─────────────────────────────┐
-│    Tell each device to tick   │
+│  1. Tell each model to tick │
+│     (Models evolve physics)   │
 └─────────────────────────────┘
       │
       ▼
 ┌─────────────────────────────┐
-│    Advance simulation clock   │
+│  2. Tell each device to tick │
+│     (Devices observe models)  │
+└─────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────┐
+│  3. Advance simulation clock │
 └─────────────────────────────┘
 ```
 
@@ -24,22 +31,33 @@ Simulation Tick
 
 ```go
 func (s *Scheduler) tick() {
+    // 1. Models evolve first (physics)
+    for _, model := range s.models {
+        model.Tick()
+    }
+    
+    // 2. Devices observe models and update memory
     for _, device := range s.devices {
         device.Tick()
     }
+    
+    // 3. Advance the clock
     s.clock.Advance(s.tickInterval)
 }
 ```
 
-The scheduler tells devices to tick. Devices execute their own behaviors.
+Models tick first to ensure devices see consistent, updated physical state.
 
 ## Determinism
 
 Execution is deterministic:
 
-1. Devices tick in registration order
-2. Behaviors tick in registration order
-3. Same inputs → same outputs
+1. Models tick in registration order
+2. Devices tick in registration order
+3. Behaviors tick in registration order
+4. Same inputs → same outputs, every time
+
+This enables reproducible testing and training scenarios.
 
 ## Configuration
 

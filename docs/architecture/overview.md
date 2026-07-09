@@ -1,5 +1,17 @@
 # Industrial Simulation Runtime
 
+## Vision
+
+> **A Virtual Industrial Laboratory for industrial software development.**
+
+This project provides a deterministic virtual industrial environment for developing, testing, commissioning, and training industrial software through realistic virtual industrial environments.
+
+**Use cases:** Software development, Controller development, SCADA development, Protocol integration, Factory Acceptance Testing, Commissioning, Training, Education, Demonstrations.
+
+See [Vision](vision.md) for the complete vision statement.
+
+---
+
 ## Architectural Philosophy
 
 **The devices are the system. Simulation Models represent the physical world. The runtime hosts both.**
@@ -42,24 +54,17 @@ The runtime simply hosts and schedules devices.
 Everything else is a plugin.
 ```
 
----
+### Fitness for Purpose
 
-## Project Vision
+Every feature is evaluated against this question:
 
-This is a **generic Industrial Simulation Runtime** written in Go. It hosts virtual industrial devices across multiple domains:
+> *"Does this improve the ability to develop, test, commission, or train industrial software?"*
 
-- Energy
-- Manufacturing
-- Water
-- Building Automation
-- Oil & Gas
+If the answer is no, it should probably not be part of the Runtime.
 
-The runtime is **not**:
-- A power system simulator
-- A protocol simulator
-- A digital twin platform
+### Believe Before Sophisticate
 
-Energy is only one possible plugin domain.
+Models should be **credible** before they become **sophisticated**. Simple deterministic models are preferred over highly accurate but complex models unless additional fidelity clearly benefits industrial software development.
 
 ---
 
@@ -170,12 +175,29 @@ Simulation Models provide the physical world. Devices observe models and publish
 
 ## Design Philosophy
 
-- **Deterministic** - Same inputs produce same outputs
+- **Deterministic** - Same inputs produce same outputs, every time
 - **Memory-driven** - Memory is the single source of truth
 - **Device-centric** - Devices own their memory and behavior
-- **Simple** - No unnecessary abstractions
-- **Opinionated** - Clear architectural decisions
-- **Minimal** - The smallest runtime possible
+- **Believable before sophisticated** - Credible models, then enhance
+- **Fitness for purpose** - Every feature must improve software development
+- **Minimal** - The smallest runtime that achieves the mission
+
+---
+
+## Non-Goals
+
+This project is **not** intended to become:
+
+| Not A | Why Not |
+|--------|---------|
+| Power system analysis package | Focus is on software behavior, not power flow studies |
+| Electromagnetic transient simulator | Not needed for industrial software development |
+| Finite element solver | Out of scope for software testing |
+| CFD package | Not relevant to industrial protocols |
+| Generic physics engine | Domain-specific models are sufficient |
+| Digital twin platform | Focus is on software integration, not plant fidelity |
+
+These may inspire future plugins but are not the mission of the Runtime.
 
 ---
 
@@ -183,6 +205,7 @@ Simulation Models provide the physical world. Devices observe models and publish
 
 | Document | Description |
 |----------|-------------|
+| [Vision](vision.md) | Project purpose, audience, and philosophy |
 | [Runtime](runtime.md) | Hosts models and devices |
 | [Simulation Models](simulation-models.md) | Physical world representation |
 | [Device Model](device-model.md) | Virtual device structure |

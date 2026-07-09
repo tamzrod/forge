@@ -1,8 +1,10 @@
 # Execution Model
 
-## Overview
+## Purpose
 
-The execution model describes how a simulation runs.
+The execution model describes how a simulation runs within the Virtual Industrial Laboratory.
+
+Deterministic execution enables reproducible testing and training scenarios—the same inputs always produce the same outputs.
 
 ## Execution Flow
 

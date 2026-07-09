@@ -1,12 +1,24 @@
 # Simulation Models
 
-## Overview
+## Purpose
 
 Simulation Models represent the **physical world** in which virtual devices operate. They are first-class architectural components that model physics, not equipment.
 
+This supports the Virtual Industrial Laboratory vision: providing a believable industrial environment where software behaves as it would with real hardware.
+
 ## Why Simulation Models Exist
 
-The current architecture correctly models virtual devices. However, virtual devices require a simulated world in which to operate.
+Virtual devices require a simulated world in which to operate. A **Revenue Meter** does not generate voltage—it measures voltage from the Grid. A **Weather Station** does not generate sunlight—it measures the Weather Model. A **PV Inverter** does not create irradiance—it converts power from the Sun Model.
+
+Therefore, these physical concepts should not be modeled as devices.
+
+## Modeling Philosophy
+
+**Believe before sophisticated.** Models should be credible before they become complex.
+
+Simple deterministic models are preferred over highly accurate but complex models unless additional fidelity clearly benefits industrial software development.
+
+For software testing, a Grid Model that produces believable voltage fluctuations is more valuable than an electromagnetic transient simulator.
 
 **Examples of Physical Phenomena:**
 
@@ -15,18 +27,6 @@ The current architecture correctly models virtual devices. However, virtual devi
 | **Energy** | Grid, Sun, Wind, Weather |
 | **Water** | Reservoir, Hydraulic Network, River |
 | **Manufacturing** | Factory Power, Compressed Air, Conveyor Physics |
-
-These are **not industrial devices**. They are physical models.
-
-### The Problem with Modeling as Devices
-
-A **Revenue Meter** does not generate voltage. It measures voltage from the Grid.
-
-A **Weather Station** does not generate sunlight. It measures the Weather Model.
-
-A **PV Inverter** does not create irradiance. It converts power from the Sun Model.
-
-Therefore, these concepts should not be modeled as devices.
 
 ## Simulation Models vs Devices
 
