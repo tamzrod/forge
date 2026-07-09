@@ -246,6 +246,20 @@ const dashboardHTML = `<!DOCTYPE html>
                 </span>
             </div>
         </div>
+
+        <!-- Devices Card -->
+        <div class="card">
+            <h2>Virtual Devices</h2>
+            <div class="metric">
+                <span class="label">Device Count</span>
+                <span class="value" id="deviceCount">0</span>
+            </div>
+            <div id="deviceList">
+                <div class="metric" style="color: #666; font-style: italic;">
+                    No devices registered
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="footer">
@@ -373,6 +387,30 @@ const dashboardHTML = `<!DOCTYPE html>
                 stableEl.innerHTML = '<span class="status-indicator inactive"></span>Unstable';
                 stableEl.className = 'value bad';
             }
+
+            // Devices
+            document.getElementById('deviceCount').textContent = state.devices.count;
+            
+            const deviceList = document.getElementById('deviceList');
+            if (state.devices.devices && state.devices.devices.length > 0) {
+                let html = '';
+                for (const device of state.devices.devices) {
+                    const statusClass = device.state === 'Running' ? 'active' : 'inactive';
+                    html += '<div class="metric">';
+                    html += '<span class="label">' + escapeHtml(device.name) + '</span>';
+                    html += '<span class="value"><span class="status-indicator ' + statusClass + '"></span>' + escapeHtml(device.type) + '</span>';
+                    html += '</div>';
+                }
+                deviceList.innerHTML = html;
+            } else {
+                deviceList.innerHTML = '<div class="metric" style="color: #666; font-style: italic;">No devices registered</div>';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function formatDuration(durationNs) {

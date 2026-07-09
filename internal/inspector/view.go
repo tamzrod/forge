@@ -4,13 +4,14 @@
 // This is NOT part of the Runtime.
 // This is NOT connected to MMA2 or any protocols.
 //
-// The Simulation Inspector is a read-only developer tool that visualizes
-// the internal state of Simulation Models in real time.
+// The Simulation Inspector is a read-only developer tool that visualizes:
+// - Simulation Models (physics)
+// - Virtual Devices (equipment)
 //
 // Use cases:
 // - Verify the world is alive during development
 // - Debug simulation behavior
-// - Understand model interactions
+// - Understand model and device interactions
 //
 // The Inspector must NEVER:
 // - Modify simulation state
@@ -22,6 +23,7 @@ package inspector
 import (
 	"time"
 
+	"github.com/tamzrod/forge/internal/devices"
 	"github.com/tamzrod/forge/internal/models/clock"
 	"github.com/tamzrod/forge/internal/models/grid"
 	"github.com/tamzrod/forge/internal/models/sun"
@@ -35,6 +37,7 @@ type View struct {
 	sun     *sun.Sun
 	weather *weather.Weather
 	grid    *grid.Grid
+	registry *devices.Registry
 }
 
 // NewView creates a new read-only view of the simulation state.
@@ -45,6 +48,11 @@ func NewView(simClock *clock.Clock, sunModel *sun.Sun, weatherModel *weather.Wea
 		weather: weatherModel,
 		grid:    gridModel,
 	}
+}
+
+// SetRegistry sets the device registry for device inspection.
+func (v *View) SetRegistry(registry *devices.Registry) {
+	v.registry = registry
 }
 
 // ClockState returns the current clock state.
@@ -106,7 +114,44 @@ func (v *View) FullState() State {
 		Sun:     v.SunState(),
 		Weather: v.WeatherState(),
 		Grid:    v.GridState(),
+		Devices: v.DevicesState(),
 	}
+}
+
+// DevicesState returns the state of all registered devices.
+func (v *View) DevicesState() DevicesState {
+	if v.registry == nil {
+		return DevicesState{Devices: []DeviceState{}}
+	}
+
+	deviceStates := make([]DeviceState, 0)
+	for _, d := range v.registry.Devices() {
+		deviceStates = append(deviceStates, DeviceState{
+			ID:   string(d.ID()),
+			Type: string(d.Type()),
+			Name: d.Name(),
+			State: d.State().String(),
+		})
+	}
+
+	return DevicesState{
+		Count:   v.registry.Count(),
+		Devices: deviceStates,
+	}
+}
+
+// DevicesState represents the state of all virtual devices.
+type DevicesState struct {
+	Count   int           `json:"count"`
+	Devices []DeviceState `json:"devices"`
+}
+
+// DeviceState represents a single device's state.
+type DeviceState struct {
+	ID    string `json:"id"`
+	Type  string `json:"type"`
+	Name  string `json:"name"`
+	State string `json:"state"`
 }
 
 // ClockState represents the simulation clock state.
@@ -155,8 +200,9 @@ type GridState struct {
 
 // State represents the complete simulation state.
 type State struct {
-	Clock   ClockState `json:"clock"`
-	Sun     SunState   `json:"sun"`
+	Clock   ClockState   `json:"clock"`
+	Sun     SunState    `json:"sun"`
 	Weather WeatherState `json:"weather"`
-	Grid    GridState  `json:"grid"`
+	Grid    GridState   `json:"grid"`
+	Devices DevicesState `json:"devices"`
 }

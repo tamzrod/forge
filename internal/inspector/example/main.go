@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tamzrod/forge/internal/devices"
+	"github.com/tamzrod/forge/internal/devices/weatherstation"
 	"github.com/tamzrod/forge/internal/inspector"
 	"github.com/tamzrod/forge/internal/models/clock"
 	"github.com/tamzrod/forge/internal/models/grid"
@@ -33,8 +35,31 @@ func main() {
 
 	gridModel := grid.New(grid.DefaultConfig(), simClock)
 
+	// Create simulation context for devices
+	simContext := devices.NewContext(simClock, sunModel, weatherModel, gridModel)
+
+	// Create device registry
+	registry := devices.NewRegistry()
+
+	// Create Weather Station device
+	ws, err := weatherstation.NewStation(weatherstation.DefaultConfig(), simContext)
+	if err != nil {
+		log.Fatalf("Failed to create Weather Station: %v", err)
+	}
+
+	// Register device
+	if err := registry.Register(ws); err != nil {
+		log.Fatalf("Failed to register Weather Station: %v", err)
+	}
+
+	// Initialize device
+	if err := ws.Initialize(); err != nil {
+		log.Fatalf("Failed to initialize Weather Station: %v", err)
+	}
+
 	// Create inspector view
 	view := inspector.NewView(simClock, sunModel, weatherModel, gridModel)
+	view.SetRegistry(registry)
 
 	// Create inspector server
 	server := inspector.NewServer(view, inspector.DefaultConfig())
@@ -62,12 +87,17 @@ func main() {
 	// Advance simulation time
 	// Start at solar noon on a spring day
 	simClock.Advance(80 * 24 * time.Hour) // ~March 21
-	simClock.Advance(12 * time.Hour)      // noon
+	simClock.Advance(12 * time.Hour)       // noon
 
 	log.Println("Simulation Inspector running at http://localhost:8080")
 	log.Println("Press Ctrl+C to stop")
 	log.Println()
-	log.Println("Simulating 24 hours of sun movement...")
+	log.Println("Simulation models: Clock, Sun, Weather, Grid")
+	log.Println("Virtual devices: Weather Station #1")
+	log.Println()
+	log.Println("The Weather Station observes the Weather Model")
+	log.Println("and copies values to its operational memory.")
+	log.Println()
 
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -76,25 +106,31 @@ func main() {
 	for {
 		select {
 		case <-ctx.Done():
+			ws.Shutdown()
+			registry.Shutdown()
 			server.Stop()
 			return
 		case <-ticker.C:
-			// Tick all models
+			// Tick simulation models
 			simClock.Tick()
 			sunModel.Tick()
 			weatherModel.Tick()
 			gridModel.Tick()
 
-			// Inject some power to demonstrate grid response
+			// Tick devices (they observe models)
+			registry.Tick()
+
+			// Demonstrate the separation between model and device
 			if tickCount%100 == 0 {
-				gridModel.InjectActivePower(50.0)
-				gridModel.InjectReactivePower(25.0)
+				log.Printf("Weather Model: %.1f°C, Weather Station: %.1f°C",
+					weatherModel.Temperature(),
+					ws.Temperature())
 			}
 
 			tickCount++
 
-			// Stop after simulating a full day (every tick = 100ms)
-			if tickCount >= 864000 { // 24 hours * 60 min * 60 sec * 10 ticks
+			// Stop after simulating some time
+			if tickCount >= 86400 { // ~2 hours at 100ms tick
 				log.Println("Simulation complete")
 				cancel()
 			}
