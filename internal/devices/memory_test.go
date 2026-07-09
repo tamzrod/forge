@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func TestMemory_SetAndGet(t *testing.T) {
-	m := NewMemory()
+func TestDeviceMemory_SetAndGet(t *testing.T) {
+	m := NewDeviceMemory()
 
 	m.Set("temperature", 25.5)
 	m.Set("humidity", 60.0)
@@ -19,8 +19,8 @@ func TestMemory_SetAndGet(t *testing.T) {
 	}
 }
 
-func TestMemory_GetOrDefault(t *testing.T) {
-	m := NewMemory()
+func TestDeviceMemory_GetOrDefault(t *testing.T) {
+	m := NewDeviceMemory()
 	m.Set("existing", 42.0)
 
 	if v := m.GetOrDefault("existing", 0); v != 42.0 {
@@ -32,8 +32,8 @@ func TestMemory_GetOrDefault(t *testing.T) {
 	}
 }
 
-func TestMemory_Values(t *testing.T) {
-	m := NewMemory()
+func TestDeviceMemory_Values(t *testing.T) {
+	m := NewDeviceMemory()
 	m.Set("a", 1.0)
 	m.Set("b", 2.0)
 
@@ -48,8 +48,8 @@ func TestMemory_Values(t *testing.T) {
 	}
 }
 
-func TestMemory_Contains(t *testing.T) {
-	m := NewMemory()
+func TestDeviceMemory_Contains(t *testing.T) {
+	m := NewDeviceMemory()
 	m.Set("exists", 1.0)
 
 	if !m.Contains("exists") {
@@ -61,8 +61,8 @@ func TestMemory_Contains(t *testing.T) {
 	}
 }
 
-func TestMemory_Reset(t *testing.T) {
-	m := NewMemory()
+func TestDeviceMemory_Reset(t *testing.T) {
+	m := NewDeviceMemory()
 	m.Set("temp", 25.0)
 	m.Reset()
 

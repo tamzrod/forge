@@ -84,21 +84,25 @@ Models should be **credible** before they become **sophisticated**. Simple deter
 │                                                               │
 │  Grid │ Sun │ Wind │ Weather │ Reservoir │ Hydraulic            │
 │                                                               │
-│  Physical world - private RAM - observed by devices            │
+│  Physical world - private RAM - observed by firmware           │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                       Virtual Devices                             │
+│                      Virtual Firmware                            │
 │                                                               │
-│  Revenue Meter │ Weather Station │ PV Inverter │ Relay         │
+│  Weather Station │ PV Inverter │ Revenue Meter │ Relay         │
 │                                                               │
-│  Observe models, publish to MMA2                               │
+│  Samples models, owns device memory, exposes via interfaces    │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Operational Publisher                          │
+│                   Communication Interfaces                        │
+│                                                               │
+│  Raw Ingest │ Modbus │ DNP3 │ IEC 61850 │ MQTT │ REST         │
+│                                                               │
+│  Serialize device memory - never access models                  │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -107,32 +111,59 @@ Models should be **credible** before they become **sophisticated**. Simple deter
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-Four layers: Runtime → Models → Devices → MMA2
+Four layers: Runtime → Models → Firmware → Interfaces → MMA2
 
 ### Data Flow
 
 ```
-Simulation Truth (Models)
+Simulation Models (external physical world)
         ↓
-Device Observation (Behaviors read models)
+Virtual Firmware samples models, updates Device Memory
         ↓
-Operational Telemetry (Devices publish to MMA2)
+Communication Interfaces serialize Device Memory
         ↓
-Control Applications (Atlas-PPC, SCADA, Historians)
+MMA2 / SCADA / Historians / Atlas-PPC
 ```
+
+### Firmware Architecture
+
+Each Virtual Device represents firmware running inside an industrial device:
+
+```
+Simulation Models (external world - read-only)
+        ↓
+Virtual Firmware
+├── Identity (ID, Name, Type)
+├── Configuration
+├── Firmware Logic (samples models, updates memory)
+├── Device Memory (owned by firmware)
+└── Communication Interfaces (serialize memory)
+```
+
+Communication Interfaces:
+- Are attached to firmware
+- Read Device Memory only
+- Never access Simulation Models
+- Never perform engineering calculations
 
 ---
 
-## Device Anatomy
+## Virtual Firmware Anatomy
 
-Every virtual device owns:
+Every virtual device firmware owns:
 
 | Component | Role |
 |-----------|------|
-| **Memory** | Source of truth. Holds all device state. |
-| **Behaviors** | Logic that reads and writes memory. |
-| **Protocols** | External interfaces that expose memory. |
-| **Faults** | Modifiers that alter memory behavior. |
+| **Device Memory** | Source of truth. Internal RAM/register space owned by firmware. |
+| **Firmware Logic** | Samples models, updates memory. |
+| **Communication Interfaces** | Serialize memory for external systems. |
+| **Fault Injection Points** | Where faults modify behavior. |
+
+Device Memory stores:
+- Temperature, Humidity, Wind Speed, Pressure
+- Status, Quality, Timestamp
+- Internal state
+- Engineering values (already converted by firmware)
 
 ---
 

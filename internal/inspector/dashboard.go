@@ -249,7 +249,7 @@ const dashboardHTML = `<!DOCTYPE html>
 
         <!-- Devices Card -->
         <div class="card">
-            <h2>Virtual Devices</h2>
+            <h2>Virtual Firmware</h2>
             <div class="metric">
                 <span class="label">Device Count</span>
                 <span class="value" id="deviceCount">0</span>
@@ -261,9 +261,9 @@ const dashboardHTML = `<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Publishing Card -->
+        <!-- Interface Card -->
         <div class="card">
-            <h2>Raw Ingest Publishing</h2>
+            <h2>Communication Interfaces</h2>
             <div class="metric">
                 <span class="label">Status</span>
                 <span class="value" id="publishStatus">--</span>
@@ -409,13 +409,11 @@ const dashboardHTML = `<!DOCTYPE html>
                 stableEl.className = 'value bad';
             }
 
-            // Devices
+            // Virtual Firmware
             document.getElementById('deviceCount').textContent = state.devices.count;
             
             const deviceList = document.getElementById('deviceList');
-            let totalPacketsSent = 0;
-            let totalErrors = 0;
-            let hasPublishing = false;
+            let hasInterface = false;
             
             if (state.devices.devices && state.devices.devices.length > 0) {
                 let html = '';
@@ -426,11 +424,9 @@ const dashboardHTML = `<!DOCTYPE html>
                     html += '<span class="value"><span class="status-indicator ' + statusClass + '"></span>' + escapeHtml(device.type) + '</span>';
                     html += '</div>';
                     
-                    // Check for publishing info
-                    if (device.publishing && device.publishing.enabled) {
-                        hasPublishing = true;
-                        totalPacketsSent += device.publishing.packets_sent || 0;
-                        totalErrors += device.publishing.errors || 0;
+                    // Check for interface info
+                    if (device.interface && device.interface.enabled) {
+                        hasInterface = true;
                     }
                 }
                 deviceList.innerHTML = html;
@@ -438,31 +434,31 @@ const dashboardHTML = `<!DOCTYPE html>
                 deviceList.innerHTML = '<div class="metric" style="color: #666; font-style: italic;">No devices registered</div>';
             }
             
-            // Publishing status
+            // Communication Interface status
             const publishStatus = document.getElementById('publishStatus');
             const packetsSent = document.getElementById('packetsSent');
             const publishErrors = document.getElementById('publishErrors');
             const publishErrorRow = document.getElementById('publishErrorRow');
             const lastError = document.getElementById('lastError');
             
-            if (!hasPublishing) {
+            if (!hasInterface) {
                 publishStatus.textContent = 'Disabled';
                 publishStatus.className = 'value';
                 packetsSent.textContent = '0';
                 publishErrors.textContent = '0';
                 publishErrorRow.style.display = 'none';
             } else {
-                // Find first device with publishing
-                const publishingDevice = state.devices.devices.find(d => d.publishing && d.publishing.enabled);
-                if (publishingDevice && publishingDevice.publishing) {
-                    publishStatus.textContent = publishingDevice.publishing.connected ? 'Connected' : 'Disconnected';
-                    publishStatus.className = 'value ' + (publishingDevice.publishing.connected ? 'good' : 'bad');
-                    packetsSent.textContent = publishingDevice.publishing.packets_sent.toLocaleString();
-                    publishErrors.textContent = publishingDevice.publishing.errors.toLocaleString();
+                // Find first device with interface
+                const interfaceDevice = state.devices.devices.find(d => d.interface && d.interface.enabled);
+                if (interfaceDevice && interfaceDevice.interface) {
+                    publishStatus.textContent = interfaceDevice.interface.connected ? 'Connected' : 'Disconnected';
+                    publishStatus.className = 'value ' + (interfaceDevice.interface.connected ? 'good' : 'bad');
+                    packetsSent.textContent = interfaceDevice.interface.packets_sent.toLocaleString();
+                    publishErrors.textContent = interfaceDevice.interface.errors.toLocaleString();
                     
-                    if (publishingDevice.publishing.last_error) {
+                    if (interfaceDevice.interface.last_error) {
                         publishErrorRow.style.display = 'flex';
-                        lastError.textContent = publishingDevice.publishing.last_error;
+                        lastError.textContent = interfaceDevice.interface.last_error;
                     } else {
                         publishErrorRow.style.display = 'none';
                     }

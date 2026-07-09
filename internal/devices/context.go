@@ -7,15 +7,23 @@ import (
 	"github.com/tamzrod/forge/internal/models/weather"
 )
 
-// Context provides read-only access to Simulation Models.
+// Context provides read-only access to Simulation Models (the external world).
 //
-// Virtual Devices use this context to observe the simulated world.
-// Simulation Models are unaware of devices.
+// Virtual Firmware uses this context to observe the simulated world.
+// The firmware samples models and updates its Device Memory.
+// Simulation Models are unaware of firmware.
 //
 // Key principles:
-// - Devices can only READ from models
-// - Devices cannot modify model state directly
-// - Models don't know devices exist
+// - Firmware can only READ from models
+// - Firmware cannot modify model state
+// - Models don't know firmware exists
+//
+// Architecture:
+//   Simulation Models (external world)
+//           ↓
+//   Firmware samples through Context
+//           ↓
+//   Device Memory (firmware-owned)
 type Context struct {
 	clock   *clock.Clock
 	sun     *sun.Sun
@@ -80,11 +88,11 @@ func (c *Context) ReadWeather() WeatherSnapshot {
 
 // GridSnapshot represents a point-in-time snapshot of grid data.
 type GridSnapshot struct {
-	Voltage          float64
-	Frequency        float64
-	VoltagePU        float64
-	FrequencyPU      float64
-	IsStable         bool
+	Voltage      float64
+	Frequency   float64
+	VoltagePU    float64
+	FrequencyPU float64
+	IsStable    bool
 }
 
 // ReadGrid copies the current grid values into a snapshot.
@@ -100,12 +108,12 @@ func (c *Context) ReadGrid() GridSnapshot {
 
 // SunSnapshot represents a point-in-time snapshot of sun data.
 type SunSnapshot struct {
-	Elevation      float64
-	Azimuth        float64
-	Irradiance     float64
-	DirectNormal   float64
-	Diffuse        float64
-	IsDaytime      bool
+	Elevation    float64
+	Azimuth      float64
+	Irradiance   float64
+	DirectNormal float64
+	Diffuse      float64
+	IsDaytime    bool
 }
 
 // ReadSun copies the current sun values into a snapshot.

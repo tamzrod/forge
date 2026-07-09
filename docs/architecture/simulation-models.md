@@ -53,22 +53,26 @@ For software testing, a Grid Model that produces believable voltage fluctuations
 │                                                                         │
 │  Grid │ Sun │ Wind │ Weather │ Reservoir │ Hydraulic Network           │
 │                                                                         │
-│  Shared physical world                                                 │
+│  External physical world - private RAM                                  │
 │  No protocols, no external clients, no MMA2 publishing                 │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                          Virtual Devices                                  │
+│                        Virtual Firmware                                   │
 │                                                                         │
-│  Revenue Meter │ Weather Station │ PV Inverter │ Relay                │
+│  Weather Station │ PV Inverter │ Revenue Meter │ Relay                │
 │                                                                         │
-│  Observe models, publish to MMA2                                       │
+│  Samples models, owns Device Memory, exposes via interfaces             │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      Operational Publisher                                │
+│                    Communication Interfaces                                │
+│                                                                         │
+│  Raw Ingest │ Modbus │ DNP3 │ IEC 61850 │ MQTT │ REST                │
+│                                                                         │
+│  Serialize Device Memory only                                            │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -80,13 +84,13 @@ For software testing, a Grid Model that produces believable voltage fluctuations
 ## Data Flow
 
 ```
-Simulation Truth (Models)
+Simulation Models (external physical world)
         ↓
-Device Observation (Behaviors read models)
+Virtual Firmware samples models, updates Device Memory
         ↓
-Operational Telemetry (Devices publish to MMA2)
+Communication Interfaces serialize Device Memory
         ↓
-Control Applications (Atlas-PPC, SCADA)
+MMA2 / SCADA / Atlas-PPC
 ```
 
 ## Model API
@@ -184,150 +188,128 @@ type GridModel struct {
 
 ## Interaction
 
-Virtual Devices **observe** Simulation Models through their behaviors.
+Virtual Firmware **samples** Simulation Models through a read-only context.
 
 ### Revenue Meter observes Grid
 
 ```go
-type RevenueMeterBehavior struct {
-    device *Device
+type RevenueMeter struct {
+    *devices.BaseDevice
+    ctx *devices.Context
+    memory *devices.DeviceMemory
 }
 
-func (b *RevenueMeterBehavior) Tick() {
-    // Observe grid model
-    grid := b.device.Model("main-grid")
-    if grid == nil {
-        return
-    }
-    gridModel := grid.(*models.GridModel)
+func (r *RevenueMeter) Tick() {
+    // Sample grid model
+    grid := r.ctx.ReadGrid()
 
-    // Read grid values
-    voltage := gridModel.Voltage()
-    frequency := gridModel.Frequency()
-
-    // Write to device memory
-    b.device.Memory().WriteFloat32("input_registers", voltageAddr, voltage)
-    b.device.Memory().WriteFloat32("input_registers", freqAddr, frequency)
-
-    // Publish to MMA2
-    b.rawIngest.WriteInputRegisters(unitID, voltageReg, encode(voltage))
+    // Update device memory with observations
+    r.memory.Set("voltage", grid.Voltage)
+    r.memory.Set("frequency", grid.Frequency)
 }
 ```
 
 ### PV Inverter observes Sun and Grid
 
 ```go
-type PVInverterBehavior struct {
-    device *Device
+type PVInverter struct {
+    *devices.BaseDevice
+    ctx *devices.Context
+    memory *devices.DeviceMemory
 }
 
-func (b *PVInverterBehavior) Tick() {
-    // Observe sun model
-    sun := b.device.Model("solar-sun")
-    irradiance := sun.(*models.SunModel).Irradiance()
+func (p *PVInverter) Tick() {
+    // Sample sun model
+    sun := p.ctx.ReadSun()
+    irradiance := sun.Irradiance
 
-    // Observe grid model
-    grid := b.device.Model("main-grid")
-    gridModel := grid.(*models.GridModel)
+    // Sample grid model
+    grid := p.ctx.ReadGrid()
 
     // Compute DC power from irradiance
-    dcPower := b.calculatePower(irradiance)
+    dcPower := p.calculatePower(irradiance)
 
-    // Inject power into grid
-    gridModel.InjectActivePower(dcPower)
+    // Inject power into grid (grid is writeable via context)
+    p.ctx.Grid().InjectActivePower(dcPower)
 
-    // Write to device memory
-    b.device.Memory().WriteFloat32("output", powerAddr, dcPower)
-
-    // Publish to MMA2
-    b.rawIngest.WriteInputRegisters(unitID, powerReg, encode(dcPower))
+    // Update device memory
+    p.memory.Set("dc_power", dcPower)
 }
 ```
 
 ### Weather Station observes multiple models
 
 ```go
-type WeatherStationBehavior struct {
-    device *Device
+type WeatherStation struct {
+    *devices.BaseDevice
+    ctx *devices.Context
+    memory *devices.DeviceMemory
 }
 
-func (b *WeatherStationBehavior) Tick() {
-    // Observe sun model
-    sun := b.device.Model("weather-sun")
-    irradiance := sun.(*models.SunModel).Irradiance()
+func (w *WeatherStation) Tick() {
+    // Sample sun model
+    sun := w.ctx.ReadSun()
 
-    // Observe wind model
-    wind := b.device.Model("weather-wind")
-    windSpeed := wind.(*models.WindModel).Speed()
+    // Sample weather model
+    weather := w.ctx.ReadWeather()
 
-    // Observe weather model
-    weather := b.device.Model("ambient-weather")
-    temperature := weather.(*models.WeatherModel).Temperature()
-
-    // Add measurement noise (simulated sensor characteristics)
-    measured := b.addNoise(irradiance, windSpeed, temperature)
-
-    // Write to device memory
-    b.device.Memory().WriteFloat32("sensors", irradianceAddr, measured.irradiance)
-    b.device.Memory().WriteFloat32("sensors", windAddr, measured.windSpeed)
-    b.device.Memory().WriteFloat32("sensors", tempAddr, measured.temperature)
-
-    // Publish to MMA2
-    b.rawIngest.WriteInputRegisters(unitID, 0, encode(measured.irradiance))
-    b.rawIngest.WriteInputRegisters(unitID, 2, encode(measured.windSpeed))
-    b.rawIngest.WriteInputRegisters(unitID, 4, encode(measured.temperature))
+    // Update device memory with observations
+    w.memory.Set("temperature", weather.Temperature)
+    w.memory.Set("humidity", weather.Humidity)
+    w.memory.Set("irradiance", sun.Irradiance)
 }
 ```
+
+Firmware owns Device Memory. Communication Interfaces serialize memory without accessing models.
 
 ## Publishing
 
-Only **Virtual Devices** are responsible for publishing operational measurements.
+Only **Virtual Firmware** is responsible for publishing operational measurements.
 
 ```
-Grid Model
-    ↓
-Revenue Meter
-    ↓
-Measurement
-    ↓
-Raw Ingest
-    ↓
+Simulation Models (external world)
+        ↓
+Virtual Firmware samples and updates Device Memory
+        ↓
+Communication Interface serializes Device Memory
+        ↓
 MMA2
 ```
 
-**The Grid Model never publishes directly.** Only devices publish operational information.
+**Simulation Models never publish.** Only firmware publishes through its communication interfaces.
 
 ## Execution Order
 
-Simulation Models execute **before** Virtual Devices:
+Simulation Models execute **before** Virtual Firmware:
 
 ```
 Tick 1:
     ┌─────────────────────────────────────────────────────────┐
     │ 1. Sun Model evolves (position, irradiance)             │
-    │ 2. Wind Model evolves (speed, direction)                │
-    │ 3. Weather Model evolves (temperature, pressure)        │
-    │ 4. Grid Model evolves (voltage, frequency)              │
+    │ 2. Wind Model evolves (speed, direction)              │
+    │ 3. Weather Model evolves (temperature, pressure)      │
+    │ 4. Grid Model evolves (voltage, frequency)            │
     └─────────────────────────────────────────────────────────┘
                         ↓
     ┌─────────────────────────────────────────────────────────┐
-    │ 5. Weather Station observes models, updates memory      │
-    │ 6. PV Inverter observes sun, injects power             │
-    │ 7. Revenue Meter observes grid, records measurements    │
-    │ 8. Devices publish to MMA2                              │
+    │ 5. Weather Station firmware samples models              │
+    │ 6. PV Inverter firmware samples sun, injects power     │
+    │ 7. Revenue Meter firmware samples grid                 │
+    │ 8. Firmware pushes to communication interfaces        │
     └─────────────────────────────────────────────────────────┘
 ```
 
-This ensures devices always see consistent, updated model state.
+This ensures firmware always sees consistent, updated model state.
 
 ## Architectural Principles
 
 | Layer | Responsibility |
 |-------|----------------|
-| **Simulation Models** | Represent physics |
-| **Virtual Devices** | Represent equipment |
-| **MMA2** | Represent operational telemetry |
-| **Atlas-PPC** | Represent control logic |
+| **Simulation Models** | Represent physics (external world) |
+| **Virtual Firmware** | Owns Device Memory, samples models |
+| **Communication Interfaces** | Serialize Device Memory only |
+| **MMA2** | Receive operational telemetry |
+| **Atlas-PPC** | Control logic |
 
 Each layer owns **one responsibility**.
 
@@ -363,14 +345,14 @@ Each layer owns **one responsibility**.
 | Concept | Purpose |
 |---------|---------|
 | **Simulation Models** | Represent the physical world (physics) |
-| **Virtual Devices** | Represent equipment that observes physics |
-| **Operational Publishing** | Devices expose telemetry to MMA2 |
-| **MMA2** | Owns operational memory and protocols |
+| **Virtual Firmware** | Samples models, owns Device Memory |
+| **Communication Interfaces** | Serialize Device Memory only |
+| **MMA2** | Receive operational telemetry |
 
 The architecture mirrors a real industrial system:
 
 ```
-Physics → Devices → Operational Telemetry → Control Applications
+Physics → Firmware → Device Memory → Communication Interface → External Systems
 ```
 
 without conflating these responsibilities.

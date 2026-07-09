@@ -134,11 +134,11 @@ func (v *View) DevicesState() DevicesState {
 			State: d.State().String(),
 		}
 
-		// Check if this is a Weather Station with publishing
+		// Check if this is a Weather Station with interface
 		if ws, ok := d.(*weatherstation.Station); ok {
-			state.PublishingEnabled = true
+			state.InterfaceEnabled = true
 			pubState := ws.PublishingState()
-			state.Publishing = &PublishingInfo{
+			state.Interface = &InterfaceInfo{
 				Enabled:     pubState.Enabled,
 				Connected:  pubState.Connected,
 				PacketsSent: pubState.PacketsSent,
@@ -164,15 +164,16 @@ type DevicesState struct {
 
 // DeviceState represents a single device's state.
 type DeviceState struct {
-	ID       string         `json:"id"`
-	Type     string         `json:"type"`
-	Name     string         `json:"name"`
-	State    string         `json:"state"`
-	Publishing *PublishingInfo `json:"publishing,omitempty"`
+	ID              string          `json:"id"`
+	Type            string          `json:"type"`
+	Name            string          `json:"name"`
+	State           string          `json:"state"`
+	InterfaceEnabled bool           `json:"interface_enabled,omitempty"`
+	Interface      *InterfaceInfo  `json:"interface,omitempty"`
 }
 
-// PublishingInfo represents Raw Ingest publishing status.
-type PublishingInfo struct {
+// InterfaceInfo represents a communication interface status.
+type InterfaceInfo struct {
 	Enabled     bool   `json:"enabled"`
 	Connected  bool   `json:"connected"`
 	PacketsSent uint64 `json:"packets_sent"`

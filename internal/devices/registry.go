@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-// Registry manages all virtual devices in the simulation.
+// Registry manages all virtual firmware in the simulation.
 type Registry struct {
 	mu      sync.RWMutex
 	devices map[DeviceID]Device
@@ -83,7 +83,7 @@ func (r *Registry) DevicesByType(typ DeviceType) []Device {
 	return result
 }
 
-// Initialize initializes all registered devices.
+// Initialize initializes all registered firmware.
 func (r *Registry) Initialize() error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -96,7 +96,7 @@ func (r *Registry) Initialize() error {
 	return nil
 }
 
-// Tick ticks all registered devices.
+// Tick ticks all registered firmware.
 func (r *Registry) Tick() {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -106,7 +106,7 @@ func (r *Registry) Tick() {
 	}
 }
 
-// Shutdown shuts down all registered devices.
+// Shutdown shuts down all registered firmware.
 func (r *Registry) Shutdown() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

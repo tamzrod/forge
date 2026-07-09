@@ -1,26 +1,28 @@
-// Package devices provides the Virtual Device framework.
+// Package devices provides the Virtual Firmware framework.
 //
-// Virtual Devices observe Simulation Models and maintain their own
-// operational memory. They are the bridge between the simulated world
-// and the external applications that will eventually consume their data.
+// Each Virtual Device represents the firmware running inside an industrial device.
+// Virtual Firmware:
+// - Samples Simulation Models (the external world)
+// - Updates its Device Memory with observations
+// - Exposes Device Memory through Communication Interfaces
 //
 // Architecture:
 //
-//   Simulation Models (physics)
+//   Simulation Models (external physical world)
 //           ↓
-//   Virtual Devices (observation)
+//   Virtual Firmware (samples models, owns device memory)
 //           ↓
-//   Operational Memory (device state)
+//   Device Memory (firmware-owned internal state)
 //           ↓
-//   Protocols (future)
+//   Communication Interfaces (serialize memory for protocols)
 //           ↓
-//   MMA2 (future)
+//   External Systems (MMA2, SCADA, etc.)
 //
-// Virtual Devices:
-// - Observe Simulation Models through Simulation Context
-// - Own operational memory
-// - Know nothing about protocols
-// - Know nothing about MMA2
+// The Virtual Firmware model mirrors real embedded systems:
+// - A weather station firmware samples environmental sensors
+// - Updates its internal memory with readings
+// - Exposes memory through Modbus, Raw Ingest, etc.
+// - Never exposes raw sensor data directly
 package devices
 
 import (
@@ -34,7 +36,7 @@ type DeviceID string
 // DeviceType categorizes devices (e.g., "weather_station", "revenue_meter").
 type DeviceType string
 
-// State represents the current operational state of a device.
+// State represents the current operational state of the firmware.
 type State int
 
 const (
@@ -65,12 +67,13 @@ func (s State) String() string {
 	}
 }
 
-// Device represents a virtual industrial device.
+// Device represents virtual firmware running inside an industrial device.
 //
-// Each device:
+// Each virtual firmware:
 // - Has a unique identity (ID, Name, Type)
-// - Owns operational memory
-// - Observes Simulation Models through a context
+// - Owns Device Memory
+// - Samples Simulation Models through a context
+// - Exposes memory through Communication Interfaces
 // - Implements lifecycle methods (Initialize, Tick, Shutdown)
 type Device interface {
 	// Identity returns the device's unique identifier.
@@ -82,27 +85,27 @@ type Device interface {
 	// Name returns the device's human-readable name.
 	Name() string
 
-	// State returns the current operational state.
+	// State returns the current firmware state.
 	State() State
 
-	// Initialize prepares the device for operation.
+	// Initialize prepares the firmware for operation.
 	// Called once before the first Tick.
 	Initialize() error
 
-	// Tick advances the device by one simulation step.
-	// The device observes models and updates its operational memory.
+	// Tick advances the firmware by one simulation step.
+	// The firmware samples models and updates Device Memory.
 	Tick()
 
-	// Shutdown stops the device and releases resources.
+	// Shutdown stops the firmware and releases resources.
 	Shutdown() error
 }
 
-// BaseDevice provides common functionality for all devices.
+// BaseDevice provides common functionality for all virtual firmware.
 type BaseDevice struct {
-	mu   sync.RWMutex
-	id   DeviceID
-	typ  DeviceType
-	name string
+	mu    sync.RWMutex
+	id    DeviceID
+	typ   DeviceType
+	name  string
 	state State
 }
 
@@ -116,7 +119,7 @@ func NewBaseDevice(id DeviceID, typ DeviceType, name string) *BaseDevice {
 	}
 }
 
-func (d *BaseDevice) ID() DeviceID { return d.id }
+func (d *BaseDevice) ID() DeviceID   { return d.id }
 func (d *BaseDevice) Type() DeviceType { return d.typ }
 func (d *BaseDevice) Name() string { return d.name }
 

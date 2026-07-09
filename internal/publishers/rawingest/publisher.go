@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// State represents the publisher connection state.
+// State represents the interface connection state.
 type State int
 
 const (
@@ -34,7 +34,7 @@ func (s State) String() string {
 	}
 }
 
-// Stats holds publishing statistics.
+// Stats holds interface statistics.
 type Stats struct {
 	PacketsSent   uint64
 	BytesSent     uint64
@@ -44,31 +44,49 @@ type Stats struct {
 	LastErrorTime time.Time
 }
 
-// Publisher publishes operational memory to MMA2 using Raw Ingest.
-type Publisher struct {
+// Interface represents a Raw Ingest communication interface.
+//
+// The Interface is a communication channel that serializes Device Memory
+// and sends it to MMA2. It is NOT responsible for:
+// - Engineering calculations
+// - Value scaling
+// - Device state management
+// - Accessing Simulation Models
+//
+// The Interface simply reads Device Memory and sends bytes.
+//
+// Architecture:
+//   Virtual Firmware
+//           ↓
+//   Device Memory (owned by firmware)
+//           ↓
+//   Interface (serializes memory)
+//           ↓
+//   MMA2
+type Interface struct {
 	config   Config
 	conn     net.Conn
 	sequence uint16
 
-	mu       sync.RWMutex
-	state    State
-	stats    Stats
+	mu    sync.RWMutex
+	state State
+	stats Stats
 
-	stopCh   chan struct{}
-	doneCh   chan struct{}
-	running  atomic.Bool
+	stopCh  chan struct{}
+	doneCh  chan struct{}
+	running atomic.Bool
 
 	onStateChange func(State)
 	onStatsUpdate func(Stats)
 }
 
-// NewPublisher creates a new Raw Ingest publisher.
-func NewPublisher(cfg Config) (*Publisher, error) {
+// NewInterface creates a new Raw Ingest interface.
+func NewInterface(cfg Config) (*Interface, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 
-	return &Publisher{
+	return &Interface{
 		config: cfg,
 		state:  StateDisconnected,
 		stopCh: make(chan struct{}),
@@ -76,159 +94,159 @@ func NewPublisher(cfg Config) (*Publisher, error) {
 	}, nil
 }
 
-// Start begins the publishing loop.
-func (p *Publisher) Start() error {
-	if !p.config.Enabled {
-		log.Printf("RawIngest: Publishing disabled")
+// Start begins the interface.
+func (i *Interface) Start() error {
+	if !i.config.Enabled {
+		log.Printf("RawIngest Interface: disabled")
 		return nil
 	}
 
-	if p.running.Load() {
-		return fmt.Errorf("publisher already running")
+	if i.running.Load() {
+		return fmt.Errorf("interface already running")
 	}
 
-	p.running.Store(true)
-	go p.run()
+	i.running.Store(true)
+	go i.run()
 
 	return nil
 }
 
-// Stop stops the publisher.
-func (p *Publisher) Stop() error {
-	if !p.running.Load() {
+// Stop stops the interface.
+func (i *Interface) Stop() error {
+	if !i.running.Load() {
 		return nil
 	}
 
-	close(p.stopCh)
-	<-p.doneCh
+	close(i.stopCh)
+	<-i.doneCh
 
-	p.mu.Lock()
-	if p.conn != nil {
-		p.conn.Close()
-		p.conn = nil
+	i.mu.Lock()
+	if i.conn != nil {
+		i.conn.Close()
+		i.conn = nil
 	}
-	p.mu.Unlock()
+	i.mu.Unlock()
 
-	p.running.Store(false)
+	i.running.Store(false)
 	return nil
 }
 
-// Publish sends operational memory to MMA2.
-func (p *Publisher) Publish(values map[string]float64) error {
-	if !p.config.Enabled {
+// Publish serializes Device Memory and sends to MMA2.
+func (i *Interface) Publish(values map[string]float64) error {
+	if !i.config.Enabled {
 		return nil
 	}
 
-	if !p.running.Load() {
-		return fmt.Errorf("publisher not running")
+	if !i.running.Load() {
+		return fmt.Errorf("interface not running")
 	}
 
-	p.mu.RLock()
-	state := p.state
-	conn := p.conn
-	p.mu.RUnlock()
+	i.mu.RLock()
+	state := i.state
+	conn := i.conn
+	i.mu.RUnlock()
 
 	if state != StateConnected || conn == nil {
 		return fmt.Errorf("not connected")
 	}
 
-	// Encode values
+	// Encode values (no engineering calculations here)
 	data := EncodeMemoryValues(values)
 
 	// Create packet
-	seq := atomic.AddUint16(&p.sequence, 1)
+	seq := atomic.AddUint16(&i.sequence, 1)
 	timestamp := uint64(time.Now().UnixNano())
 
-	packet, err := EncodePacket(p.config.UnitID, seq, timestamp, TypeData, data)
+	packet, err := EncodePacket(i.config.UnitID, seq, timestamp, TypeData, data)
 	if err != nil {
-		p.recordError(fmt.Errorf("failed to encode packet: %w", err))
+		i.recordError(fmt.Errorf("failed to encode packet: %w", err))
 		return err
 	}
 
 	// Send packet
-	if err := conn.SetWriteDeadline(time.Now().Add(p.config.Timeout)); err != nil {
-		p.recordError(fmt.Errorf("failed to set deadline: %w", err))
+	if err := conn.SetWriteDeadline(time.Now().Add(i.config.Timeout)); err != nil {
+		i.recordError(fmt.Errorf("failed to set deadline: %w", err))
 		return err
 	}
 
 	n, err := conn.Write(packet)
 	if err != nil {
-		p.recordError(fmt.Errorf("failed to write: %w", err))
-		p.disconnect()
+		i.recordError(fmt.Errorf("failed to write: %w", err))
+		i.disconnect()
 		return err
 	}
 
 	// Update stats
-	p.mu.Lock()
-	p.stats.PacketsSent++
-	p.stats.BytesSent += uint64(n)
-	p.stats.LastSent = time.Now()
-	p.mu.Unlock()
+	i.mu.Lock()
+	i.stats.PacketsSent++
+	i.stats.BytesSent += uint64(n)
+	i.stats.LastSent = time.Now()
+	i.mu.Unlock()
 
-	if p.onStatsUpdate != nil {
-		p.onStatsUpdate(p.Stats())
+	if i.onStatsUpdate != nil {
+		i.onStatsUpdate(i.Stats())
 	}
 
 	return nil
 }
 
 // Stats returns a copy of current statistics.
-func (p *Publisher) Stats() Stats {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.stats
+func (i *Interface) Stats() Stats {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	return i.stats
 }
 
 // State returns the current connection state.
-func (p *Publisher) State() State {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.state
+func (i *Interface) State() State {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	return i.state
 }
 
 // IsConnected returns true if connected.
-func (p *Publisher) IsConnected() bool {
-	return p.State() == StateConnected
+func (i *Interface) IsConnected() bool {
+	return i.State() == StateConnected
 }
 
 // OnStateChange sets a callback for state changes.
-func (p *Publisher) OnStateChange(f func(State)) {
-	p.onStateChange = f
+func (i *Interface) OnStateChange(f func(State)) {
+	i.onStateChange = f
 }
 
 // OnStatsUpdate sets a callback for stats updates.
-func (p *Publisher) OnStatsUpdate(f func(Stats)) {
-	p.onStatsUpdate = f
+func (i *Interface) OnStatsUpdate(f func(Stats)) {
+	i.onStatsUpdate = f
 }
 
-// run is the main publishing loop.
-func (p *Publisher) run() {
-	defer close(p.doneCh)
+// run is the main interface loop.
+func (i *Interface) run() {
+	defer close(i.doneCh)
 
-	ticker := time.NewTicker(p.config.Interval)
+	ticker := time.NewTicker(i.config.Interval)
 	defer ticker.Stop()
 
 	retries := 0
 
 	for {
 		// Ensure connection
-		if !p.IsConnected() {
-			if err := p.connect(); err != nil {
-				log.Printf("RawIngest: Connection failed: %v", err)
+		if !i.IsConnected() {
+			if err := i.connect(); err != nil {
+				log.Printf("RawIngest Interface: Connection failed: %v", err)
 
 				retries++
-				if retries <= p.config.MaxRetries {
-					delay := p.config.ReconnectDelay * time.Duration(retries)
-					log.Printf("RawIngest: Retrying in %v (attempt %d/%d)", delay, retries, p.config.MaxRetries)
+				if retries <= i.config.MaxRetries {
+					delay := i.config.ReconnectDelay * time.Duration(retries)
+					log.Printf("RawIngest Interface: Retrying in %v (attempt %d/%d)", delay, retries, i.config.MaxRetries)
 
 					select {
-					case <-p.stopCh:
+					case <-i.stopCh:
 						return
 					case <-time.After(delay):
 						continue
 					}
 				} else {
-					log.Printf("RawIngest: Max retries reached, waiting for manual reconnect")
+					log.Printf("RawIngest Interface: Max retries reached")
 					retries = 0
 				}
 			} else {
@@ -237,7 +255,7 @@ func (p *Publisher) run() {
 		}
 
 		select {
-		case <-p.stopCh:
+		case <-i.stopCh:
 			return
 		case <-ticker.C:
 			// Ticker fires, but actual publishing is done externally
@@ -247,61 +265,61 @@ func (p *Publisher) run() {
 }
 
 // connect establishes connection to MMA2.
-func (p *Publisher) connect() error {
-	p.setState(StateConnecting)
+func (i *Interface) connect() error {
+	i.setState(StateConnecting)
 
-	address := p.config.Address()
-	log.Printf("RawIngest: Connecting to %s", address)
+	address := i.config.Address()
+	log.Printf("RawIngest Interface: Connecting to %s", address)
 
-	conn, err := net.DialTimeout("tcp", address, p.config.Timeout)
+	conn, err := net.DialTimeout("tcp", address, i.config.Timeout)
 	if err != nil {
-		p.setState(StateError)
+		i.setState(StateError)
 		return fmt.Errorf("dial failed: %w", err)
 	}
 
-	p.mu.Lock()
-	p.conn = conn
-	p.mu.Unlock()
+	i.mu.Lock()
+	i.conn = conn
+	i.mu.Unlock()
 
-	p.setState(StateConnected)
-	log.Printf("RawIngest: Connected to %s", address)
+	i.setState(StateConnected)
+	log.Printf("RawIngest Interface: Connected to %s", address)
 
 	return nil
 }
 
 // disconnect closes the connection.
-func (p *Publisher) disconnect() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+func (i *Interface) disconnect() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
 
-	if p.conn != nil {
-		p.conn.Close()
-		p.conn = nil
+	if i.conn != nil {
+		i.conn.Close()
+		i.conn = nil
 	}
 
-	p.setState(StateDisconnected)
+	i.setState(StateDisconnected)
 }
 
 // recordError records an error and triggers reconnect.
-func (p *Publisher) recordError(err error) {
-	p.mu.Lock()
-	p.stats.Errors++
-	p.stats.LastError = err.Error()
-	p.stats.LastErrorTime = time.Now()
-	p.mu.Unlock()
+func (i *Interface) recordError(err error) {
+	i.mu.Lock()
+	i.stats.Errors++
+	i.stats.LastError = err.Error()
+	i.stats.LastErrorTime = time.Now()
+	i.mu.Unlock()
 
-	if p.onStatsUpdate != nil {
-		p.onStatsUpdate(p.Stats())
+	if i.onStatsUpdate != nil {
+		i.onStatsUpdate(i.Stats())
 	}
 }
 
 // setState updates the connection state.
-func (p *Publisher) setState(state State) {
-	p.mu.Lock()
-	p.state = state
-	p.mu.Unlock()
+func (i *Interface) setState(state State) {
+	i.mu.Lock()
+	i.state = state
+	i.mu.Unlock()
 
-	if p.onStateChange != nil {
-		p.onStateChange(state)
+	if i.onStateChange != nil {
+		i.onStateChange(state)
 	}
 }

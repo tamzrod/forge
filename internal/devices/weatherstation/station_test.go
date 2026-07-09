@@ -14,16 +14,16 @@ func testContext() (*devices.Context, *weather.Weather) {
 		Mode:        clock.ModeManual,
 		TickInterval: time.Hour,
 	})
-	
+
 	weatherModel := weather.New(weather.DefaultConfig(), simClock)
-	
+
 	return devices.NewContext(simClock, nil, weatherModel, nil), weatherModel
 }
 
 func TestNewStation(t *testing.T) {
 	ctx, _ := testContext()
 	cfg := DefaultConfig()
-	cfg.Publishing.Enabled = false // Disable publishing for tests
+	cfg.Publishing.Enabled = false // Disable interface for tests
 
 	station, err := NewStation(cfg, ctx)
 	if err != nil {
@@ -133,7 +133,7 @@ func TestStation_Memory(t *testing.T) {
 
 func TestStation_TemperatureConversion(t *testing.T) {
 	ctx, _ := testContext()
-	
+
 	// Create station with Fahrenheit units
 	cfg := Config{
 		ID:   "station-001",
@@ -143,7 +143,7 @@ func TestStation_TemperatureConversion(t *testing.T) {
 			Enabled: false,
 		},
 	}
-	
+
 	station, _ := NewStation(cfg, ctx)
 	station.Initialize()
 
@@ -224,7 +224,7 @@ func TestStation_PublishingState(t *testing.T) {
 	}
 }
 
-func TestStation_PublishWithoutPublisher(t *testing.T) {
+func TestStation_PublishWithoutInterface(t *testing.T) {
 	ctx, _ := testContext()
 	cfg := DefaultConfig()
 	cfg.Publishing.Enabled = false
@@ -232,7 +232,7 @@ func TestStation_PublishWithoutPublisher(t *testing.T) {
 	station, _ := NewStation(cfg, ctx)
 	station.Initialize()
 
-	// Should not panic even without publisher
+	// Should not panic even without interface
 	station.Tick()
 
 	if station.State() != devices.StateRunning {
