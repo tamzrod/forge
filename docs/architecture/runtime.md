@@ -120,8 +120,55 @@ The runtime knows nothing about:
 - Water
 - Manufacturing
 - Any industrial domain
+- float32, int32, or any data type
+- Engineering units
+- Scaling
+- Register layouts
+- Application semantics
 
 All domain knowledge lives in plugins.
+
+## Separation of Responsibilities
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           Runtime (Infrastructure)                        │
+│                                                                         │
+│  Scheduler │ Clock │ Device Registry │ Plugin Loader                   │
+│                                                                         │
+│  RAW INGEST CLIENT (low-level memory operations only)                   │
+│  - WriteHoldingRegisters()                                              │
+│  - WriteInputRegisters()                                               │
+│  - WriteCoils()                                                        │
+│  - WriteDiscreteInputs()                                                │
+│                                                                         │
+│  The runtime does NOT know:                                            │
+│  - float32, int32                                                      │
+│  - Temperature, Voltage, Power                                         │
+│  - Engineering units or scaling                                         │
+│  - Register maps                                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Device (Domain Logic)                             │
+│                                                                         │
+│  Weather Device │ PV Device │ Meter Device │ etc.                     │
+│                                                                         │
+│  Each device knows:                                                    │
+│  - Its own engineering semantics                                        │
+│  - How to encode values (float32 → uint16)                            │
+│  - How to scale values                                                 │
+│  - Its register allocation in MMA2                                     │
+│                                                                         │
+│  Device encodes and calls runtime's low-level Raw Ingest               │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+This separation ensures:
+- A developer can add a new device type without modifying the runtime
+- The runtime remains generic enough for any industrial domain
+- Domain knowledge is encapsulated in plugins
 
 ## Adding New Domains
 
