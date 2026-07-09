@@ -88,32 +88,43 @@ After each write, MMA2 returns **exactly 1 byte**:
 
 ## Integration Architecture
 
+### Low-Level Raw Ingest Client
+
+The Raw Ingest client exposes only memory operations:
+
 ```go
-// RawIngestPublisher publishes to MMA2
-type RawIngestPublisher interface {
-    Publish(area uint8, unitID uint16, address uint16, values []byte) error
+// RawIngestClient provides low-level memory operations
+// It does NOT know about float32, temperature, voltage, or any engineering unit
+type RawIngestClient interface {
+    WriteHoldingRegisters(unitID uint16, address uint16, values []byte) error
+    WriteInputRegisters(unitID uint16, address uint16, values []byte) error
+    WriteCoils(unitID uint16, address uint16, values []byte) error
+    WriteDiscreteInputs(unitID uint16, address uint16, values []byte) error
 }
 ```
 
-### Device publishes to MMA2
+### Device Owns Encoding
+
+The device is responsible for encoding:
 
 ```go
-func (b *WeatherBehavior) Tick() {
-    // Read from device memory
-    irradiance := b.device.Memory().ReadFloat32("input_registers", irradianceAddr)
+// WeatherDevice encodes engineering values
+func (d *WeatherDevice) Tick() {
+    // Read from device memory (engineering value)
+    irradiance := d.Memory().ReadFloat32("sensors", irradianceAddr)
     
     // Write to device memory (internal)
-    b.device.Memory().WriteFloat32("input_registers", powerAddr, power)
+    d.Memory().WriteFloat32("computed", powerAddr, power)
     
-    // Publish to MMA2 via Raw Ingest
-    // Convert float32 to uint16 (with scaling)
-    rawValue := uint16(irradiance * 10) // Example scaling
+    // Device encodes: float32 → uint16 with scaling
+    // 0-2000 W/m² → 0-65535
+    rawValue := uint16((irradiance / 2000.0) * 65535.0)
     
-    b.publisher.Publish(
-        area: 4,           // Input Registers
-        unitID: 1,         // Unit ID
-        address: 0,        // Address
-        values: toBigEndian(rawValue),
+    // Device publishes to MMA2 (low-level memory operation)
+    d.rawIngest.WriteInputRegisters(
+        unitID:  1,
+        address: 0,
+        values:  toBigEndian(rawValue),
     )
 }
 ```
@@ -151,27 +162,55 @@ runtime.ConnectMMA2("localhost:5020")
 
 The Simulation Runtime should NOT import MMA2 packages.
 
-Implement Raw Ingest as a standalone TCP client:
+Implement Raw Ingest as a standalone TCP client with low-level operations only:
 
 ```go
-// rawingest/publisher.go
+// rawingest/client.go
+// Low-level memory operations only - no engineering knowledge
 package rawingest
 
 import (
     "encoding/binary"
+    "fmt"
     "net"
 )
 
-type Publisher struct {
+// Area constants
+const (
+    AreaCoils          = 1
+    AreaDiscreteInputs = 2
+    AreaHoldingRegs    = 3
+    AreaInputRegs     = 4
+)
+
+// Client provides low-level Modbus memory operations
+// It does NOT know about float32, temperature, voltage, or any engineering unit
+type Client struct {
     addr string
 }
 
-func NewPublisher(addr string) *Publisher {
-    return &Publisher{addr: addr}
+func NewClient(addr string) *Client {
+    return &Client{addr: addr}
 }
 
-func (p *Publisher) Publish(area, unitID, address uint16, values []byte) error {
-    conn, err := net.Dial("tcp", p.addr)
+func (c *Client) WriteInputRegisters(unitID, address uint16, values []byte) error {
+    return c.write(AreaInputRegs, unitID, address, values)
+}
+
+func (c *Client) WriteHoldingRegisters(unitID, address uint16, values []byte) error {
+    return c.write(AreaHoldingRegs, unitID, address, values)
+}
+
+func (c *Client) WriteCoils(unitID, address uint16, values []byte) error {
+    return c.write(AreaCoils, unitID, address, values)
+}
+
+func (c *Client) WriteDiscreteInputs(unitID, address uint16, values []byte) error {
+    return c.write(AreaDiscreteInputs, unitID, address, values)
+}
+
+func (c *Client) write(area uint8, unitID, address uint16, values []byte) error {
+    conn, err := net.Dial("tcp", c.addr)
     if err != nil {
         return err
     }
@@ -182,10 +221,10 @@ func (p *Publisher) Publish(area, unitID, address uint16, values []byte) error {
     pkt[0] = 'R'
     pkt[1] = 'I'
     pkt[2] = 0x01        // version
-    pkt[3] = uint8(area) // area
+    pkt[3] = area
     binary.BigEndian.PutUint16(pkt[4:6], unitID)
     binary.BigEndian.PutUint16(pkt[6:8], address)
-    binary.BigEndian.PutUint16(pkt[8:10], uint16(len(values)/2)) // count
+    binary.BigEndian.PutUint16(pkt[8:10], uint16(len(values)/2)) // count (uint16 words)
     copy(pkt[10:], values)
     
     if _, err := conn.Write(pkt); err != nil {
@@ -202,38 +241,41 @@ func (p *Publisher) Publish(area, unitID, address uint16, values []byte) error {
 }
 ```
 
-### Area Constants
+### Encoding is Device Responsibility
+
+Devices handle encoding. The runtime does not know about float32, scaling, or engineering units:
 
 ```go
-const (
-    AreaCoils          = 1
-    AreaDiscreteInputs = 2
-    AreaHoldingRegs    = 3
-    AreaInputRegs     = 4
-)
+// WeatherDevice - device owns encoding
+func (d *WeatherDevice) Tick() {
+    // Read engineering value from device memory
+    irradiance := d.Memory().ReadFloat32("sensors", irradianceAddr)
+    
+    // Device encodes: float32 → uint16
+    // 0-2000 W/m² → 0-65535
+    scaled := (irradiance / 2000.0) * 65535.0
+    raw := make([]byte, 2)
+    binary.BigEndian.PutUint16(raw, uint16(scaled))
+    
+    // Device publishes via low-level Raw Ingest
+    d.rawIngest.WriteInputRegisters(1, 0, raw)
+}
 ```
 
-### Value Encoding
+### Value Encoding Rules
 
 - **Bit areas** (Coils, Discrete Inputs): bits packed LSB-first, padded to byte boundary
 - **Register areas** (Holding, Input): big-endian uint16 words, 2 bytes each
 
-### Scaling
+### What This Is NOT
 
-MMA2 stores raw 16-bit values. Simulation Runtime handles scaling:
+The Raw Ingest client does NOT provide:
+- `WriteFloat32()` - Device encodes float32
+- `WriteTemperature()` - Device owns temperature semantics
+- `WriteVoltage()` - Device owns voltage semantics
+- Any engineering unit conversion
 
-```go
-// Sensor outputs float32
-irradiance := float32(850.5) // W/m²
-
-// Scale to uint16
-// Example: 0-2000 W/m² → 0-65535
-scaled := (irradiance / 2000.0) * 65535.0
-raw := uint16(scaled)
-
-// Publish to MMA2
-publisher.Publish(AreaInputRegs, unitID, address, toBigEndian(raw))
-```
+These belong in device implementations.
 
 ## Real vs Virtual Equivalence
 

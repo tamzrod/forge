@@ -281,3 +281,51 @@ Faults modify memory behavior:
 - **Offline**: All locations set to QualityOffline
 
 Faults don't own state. They only intercept memory access.
+
+## Encoding and Scaling (Device Responsibility)
+
+Device memory stores raw bytes. Encoding and scaling are device responsibilities.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Device Memory (raw bytes)                          │
+│                                                                         │
+│  Regions: "sensors", "computed", "output"                              │
+│  Types: uint8, uint16, uint32, float32 (raw bytes)                     │
+│                                                                         │
+│  Device memory does NOT know:                                           │
+│  - Engineering units (°C, W/m², V, MW)                                 │
+│  - Scaling factors                                                      │
+│  - Register maps in MMA2                                               │
+└─────────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ Device encodes
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         MMA2 (raw uint16)                                │
+│                                                                         │
+│  Areas: HoldingRegisters, InputRegisters, Coils, DiscreteInputs         │
+│  Values: raw uint16 or bits                                            │
+│                                                                         │
+│  MMA2 does NOT know:                                                   │
+│  - Temperature, irradiance, power                                       │
+│  - Scaling                                                             │
+│  - What the values represent                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Example: Weather Device Encoding
+
+```go
+// Device reads engineering value from memory
+irradiance := device.Memory().ReadFloat32("sensors", 0) // 850.5 W/m²
+
+// Device encodes for MMA2 (0-2000 W/m² → 0-65535)
+scaled := (irradiance / 2000.0) * 65535.0
+raw := encodeFloat32(scaled)
+
+// Device writes to MMA2
+rawIngest.WriteInputRegisters(unitID, 0, raw)
+```
+
+The runtime knows nothing about encoding, scaling, or engineering units. Only the device knows.
