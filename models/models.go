@@ -210,7 +210,7 @@ func (s *SunModel) Tick() {
 	}
 
 	// Calculate elevation from hour angle (simplified)
-	s.elevation = 45.0 * math.Sin(float64(s.solarHourAngle)*math.Pi/180.0)
+	s.elevation = float32(45.0 * math.Sin(float64(s.solarHourAngle)*math.Pi/180.0))
 	if s.elevation < 0 {
 		s.elevation = 0
 		s.irradiance = 0

@@ -14,7 +14,7 @@ import (
 type Scheduler struct {
 	mu          sync.Mutex
 	devices     []*device.Device
-	models      []Model
+	models      []models.Model
 	tickInterval time.Duration
 	clock        SimulationClock
 	running      bool

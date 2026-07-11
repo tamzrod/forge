@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 )
 
@@ -122,13 +123,13 @@ func (m *MemoryImage) ReadFloat32(region string, address uint32) (float32, error
 	if err != nil {
 		return 0, err
 	}
-	return binary.BigEndian.Uint32(data), nil
+	return math.Float32frombits(binary.BigEndian.Uint32(data)), nil
 }
 
 // WriteFloat32 writes a 32-bit float.
 func (m *MemoryImage) WriteFloat32(region string, address uint32, value float32) error {
 	data := make([]byte, 4)
-	binary.BigEndian.PutUint32(data, value)
+	binary.BigEndian.PutUint32(data, math.Float32bits(value))
 	return m.Write(region, address, data)
 }
 

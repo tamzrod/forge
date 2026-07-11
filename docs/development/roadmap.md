@@ -8,20 +8,24 @@ This roadmap outlines the development trajectory for the Industrial Simulation R
 
 **Goal:** Core runtime with basic simulation capabilities.
 
-### Milestone 1.1 - Runtime Core
+### Milestone 1.1 - Runtime Core ✅
 
-- [ ] Runtime initialization and shutdown
-- [ ] Basic device lifecycle (create, destroy)
-- [ ] Memory management (allocate, read, write)
-- [ ] Scheduler with fixed tick interval
-- [ ] Configuration from YAML
+- [x] Runtime initialization and shutdown
+- [x] Basic device lifecycle (create, destroy)
+- [x] Memory management (allocate, read, write)
+- [x] Scheduler with fixed tick interval
+- [x] Configuration from YAML
 
-### Milestone 1.2 - Behaviors
+**Evidence:** `examples/complete/main.go` demonstrates all Milestone 1.1 items
 
-- [ ] Behavior interface
-- [ ] Behavior registration
-- [ ] Behavior execution on tick
-- [ ] Memory access from behaviors
+### Milestone 1.2 - Behaviors ✅
+
+- [x] Behavior interface
+- [x] Behavior registration
+- [x] Behavior execution on tick
+- [x] Memory access from behaviors
+
+**Evidence:** `examples/complete/main.go` contains WeatherStationBehavior, PVInverterBehavior, RevenueMeterBehavior
 
 ### Milestone 1.3 - Protocols
 

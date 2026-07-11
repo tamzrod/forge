@@ -59,6 +59,14 @@
 
 ---
 
+## Examples
+
+| Document | Description |
+|----------|-------------|
+| [End-to-End Example](examples/end-to-end.md) | Complete architecture validation |
+
+---
+
 ## Quick Reference
 
 ### Architecture Layers
