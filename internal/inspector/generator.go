@@ -495,7 +495,7 @@ func (g *Generator) InspectDevice(deviceID string) (*GenericInspectorData, error
 
 	// Check if this is a Weather Station and add Memory section
 	if ws, ok := g.getWeatherStation(deviceID); ok {
-		wsState := ws.State()
+		wsState := ws.Status()
 		data.Sections = append(data.Sections, &Section{
 			ID:    SectionMemory,
 			Title: "Device Memory",
@@ -549,7 +549,7 @@ func (g *Generator) InspectFirmware(deviceID string) (*GenericInspectorData, err
 		return nil, fmt.Errorf("firmware not found: %s", deviceID)
 	}
 
-	wsState := ws.State()
+	wsState := ws.Status()
 
 	data := &GenericInspectorData{
 		Object: ObjectIdentity{
@@ -613,7 +613,7 @@ func (g *Generator) InspectMemory(deviceID string) (*GenericInspectorData, error
 		return nil, fmt.Errorf("memory not found: %s", deviceID)
 	}
 
-	wsState := ws.State()
+	wsState := ws.Status()
 
 	// Build memory region properties
 	memProps := []*Property{
@@ -662,7 +662,7 @@ func (g *Generator) InspectMemory(deviceID string) (*GenericInspectorData, error
 				Title: "Overview",
 				Icon:  "eye",
 				Properties: []*Property{
-					IntProperty("Total Values", int64(len(wsState.PublishingState().Enabled == false)*8+1)), // Approximate
+					IntProperty("Total Values", 8), // Approximate
 					TextProperty("Quality", "Good"),
 				},
 			},

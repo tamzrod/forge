@@ -31,9 +31,6 @@ type Packet struct {
 
 // EncodePacket encodes a packet into bytes.
 func EncodePacket(unitID uint8, seq uint16, timestamp uint64, packetType uint8, data []byte) ([]byte, error) {
-	// Calculate total size
-	totalSize := HeaderSize + len(data)
-
 	// Build packet
 	buf := new(bytes.Buffer)
 

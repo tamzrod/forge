@@ -129,7 +129,7 @@ func (d *BaseDevice) State() State {
 	return d.state
 }
 
-func (d *BaseDevice) setState(state State) {
+func (d *BaseDevice) SetState(state State) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.state = state

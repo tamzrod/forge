@@ -16,18 +16,18 @@ func newMockDevice(id DeviceID, typ DeviceType, name string) *mockDevice {
 }
 
 func (m *mockDevice) Initialize() error {
-	m.setState(StateInitialized)
+	m.SetState(StateInitialized)
 	return nil
 }
 
 func (m *mockDevice) Tick() {
 	if m.State() == StateInitialized {
-		m.setState(StateRunning)
+		m.SetState(StateRunning)
 	}
 }
 
 func (m *mockDevice) Shutdown() error {
-	m.setState(StateStopped)
+	m.SetState(StateStopped)
 	return nil
 }
 

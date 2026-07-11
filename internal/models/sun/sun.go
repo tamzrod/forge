@@ -154,6 +154,9 @@ func (s *Sun) update() {
 		s.azimuth = 180.0 + azFromEast
 	}
 
+	// Normalize azimuth to [0, 360)
+	s.azimuth = math.Mod(s.azimuth+360.0, 360.0)
+
 	// Calculate irradiance
 	if s.elevation <= 0 {
 		// Sun below horizon

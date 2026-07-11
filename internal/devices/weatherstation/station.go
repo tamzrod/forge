@@ -75,8 +75,8 @@ func NewStation(cfg Config, ctx *devices.Context) (*Station, error) {
 
 // Initialize prepares the Weather Station firmware for operation.
 func (s *Station) Initialize() error {
-	if s.State() != devices.StateCreated {
-		return fmt.Errorf("cannot initialize device in state %s", s.State())
+	if s.BaseDevice.State() != devices.StateCreated {
+		return fmt.Errorf("cannot initialize device in state %s", s.BaseDevice.State())
 	}
 
 	// Initialize device memory with default values
@@ -97,19 +97,19 @@ func (s *Station) Initialize() error {
 		}
 	}
 
-	s.setState(devices.StateInitialized)
+	s.BaseDevice.SetState(devices.StateInitialized)
 	return nil
 }
 
 // Tick advances the Weather Station firmware by one simulation step.
 // The firmware samples the Weather Model and updates Device Memory.
 func (s *Station) Tick() {
-	if s.State() != devices.StateInitialized && s.State() != devices.StateRunning {
+	if s.BaseDevice.State() != devices.StateInitialized && s.BaseDevice.State() != devices.StateRunning {
 		return
 	}
 
-	if s.State() == devices.StateInitialized {
-		s.setState(devices.StateRunning)
+	if s.BaseDevice.State() == devices.StateInitialized {
+		s.BaseDevice.SetState(devices.StateRunning)
 	}
 
 	// Sample weather model (external world)
@@ -169,7 +169,7 @@ func (s *Station) convertTemperature(celsius float64) float64 {
 
 // Shutdown stops the Weather Station firmware.
 func (s *Station) Shutdown() error {
-	s.setState(devices.StateStopped)
+	s.BaseDevice.SetState(devices.StateStopped)
 
 	if s.publisher != nil {
 		s.publisher.Stop()
@@ -246,8 +246,8 @@ func (s *Station) PublishingState() PublishingState {
 	return state
 }
 
-// State returns a snapshot of all measurements.
-func (s *Station) State() WeatherStationState {
+// Status returns a snapshot of all measurements.
+func (s *Station) Status() WeatherStationState {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

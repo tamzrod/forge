@@ -34,7 +34,7 @@ func TestDecodePacket_Valid(t *testing.T) {
 		0x00, 0x00, // CRC placeholder
 	}
 
-	packet, err := DecodePacket(data)
+	_, err := DecodePacket(data)
 	if err != nil {
 		// CRC will fail which is expected without proper CRC calculation
 		t.Logf("Decode failed (expected with placeholder CRC): %v", err)

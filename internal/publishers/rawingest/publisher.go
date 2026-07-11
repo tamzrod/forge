@@ -66,7 +66,7 @@ type Stats struct {
 type Interface struct {
 	config   Config
 	conn     net.Conn
-	sequence uint16
+	sequence uint32
 
 	mu    sync.RWMutex
 	state State
@@ -154,10 +154,10 @@ func (i *Interface) Publish(values map[string]float64) error {
 	data := EncodeMemoryValues(values)
 
 	// Create packet
-	seq := atomic.AddUint16(&i.sequence, 1)
+	seq := atomic.AddUint32(&i.sequence, 1)
 	timestamp := uint64(time.Now().UnixNano())
 
-	packet, err := EncodePacket(i.config.UnitID, seq, timestamp, TypeData, data)
+	packet, err := EncodePacket(i.config.UnitID, uint16(seq), timestamp, TypeData, data)
 	if err != nil {
 		i.recordError(fmt.Errorf("failed to encode packet: %w", err))
 		return err

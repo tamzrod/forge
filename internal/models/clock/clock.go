@@ -24,6 +24,19 @@ const (
 	ModeAccelerated
 )
 
+func (m Mode) String() string {
+	switch m {
+	case ModeRealtime:
+		return "Realtime"
+	case ModeManual:
+		return "Manual"
+	case ModeAccelerated:
+		return "Accelerated"
+	default:
+		return "Unknown"
+	}
+}
+
 // Clock provides deterministic simulation time.
 // All simulation models must use this clock instead of system time.
 type Clock struct {

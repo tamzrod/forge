@@ -174,10 +174,6 @@ func (g *Grid) Tick() {
 // regulate adjusts voltage and frequency based on power balance.
 // This is a simplified droop characteristic model.
 func (g *Grid) regulate() {
-	// Calculate per-unit values
-	puVoltage := g.voltage / g.nominalVoltage
-	puFreq := g.frequency / g.nominalFrequency
-
 	// Reactive power affects voltage (simplified)
 	// Q imbalance causes voltage to change
 	// Grid strength determines how much

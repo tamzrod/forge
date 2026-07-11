@@ -162,7 +162,15 @@ type testBehavior struct {
 	tick     func()
 }
 
-func (b *testBehavior) ID() string              { return b.id }
-func (b *testBehavior) Attach(d *Device)          { b.attachFn(d) }
-func (b *testBehavior) Detach()                   { b.detachFn() }
-func (b *testBehavior) Tick()                     { b.tick() }
+func (b *testBehavior) ID() string   { return b.id }
+func (b *testBehavior) Attach(d *Device) {
+	if b.attachFn != nil {
+		b.attachFn(d)
+	}
+}
+func (b *testBehavior) Detach() {
+	if b.detachFn != nil {
+		b.detachFn()
+	}
+}
+func (b *testBehavior) Tick() { b.tick() }

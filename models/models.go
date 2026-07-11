@@ -137,12 +137,12 @@ func (g *GridModel) Tick() {
 
 // SetVoltage sets the grid voltage directly (for testing/scenarios).
 func (g *GridModel) SetVoltage(v float32) {
-	g.voltage = clamp(v, 0, 10000)
+	g.voltage = clamp(v, 450, 520)
 }
 
 // SetFrequency sets the grid frequency directly (for testing/scenarios).
 func (g *GridModel) SetFrequency(f float32) {
-	g.frequency = clamp(f, 0, 100)
+	g.frequency = clamp(f, 59.5, 60.5)
 }
 
 // SunModel represents the sun.
@@ -389,8 +389,8 @@ func NewReservoirModel(id ModelID, area float32) *ReservoirModel {
 		ModelBase: NewModelBase(id, "reservoir"),
 		level:     50.0,
 		area:      area,
-		flowIn:    10.0,
-		flowOut:   5.0,
+		flowIn:    0.0,
+		flowOut:   0.0,
 		temp:      15.0,
 	}
 }

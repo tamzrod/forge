@@ -66,8 +66,8 @@ func TestStation_Initialize(t *testing.T) {
 		t.Fatalf("failed to initialize: %v", err)
 	}
 
-	if station.State() != devices.StateInitialized {
-		t.Errorf("expected state Initialized, got %s", station.State())
+	if station.Status() != devices.StateInitialized {
+		t.Errorf("expected state Initialized, got %s", station.Status())
 	}
 
 	// Check initial memory values
@@ -88,8 +88,8 @@ func TestStation_Tick(t *testing.T) {
 	// Tick and check observation
 	station.Tick()
 
-	if station.State() != devices.StateRunning {
-		t.Errorf("expected state Running, got %s", station.State())
+	if station.Status() != devices.StateRunning {
+		t.Errorf("expected state Running, got %s", station.Status())
 	}
 
 	// Weather Station should have copied weather values
@@ -113,8 +113,8 @@ func TestStation_Shutdown(t *testing.T) {
 		t.Fatalf("failed to shutdown: %v", err)
 	}
 
-	if station.State() != devices.StateStopped {
-		t.Errorf("expected state Stopped, got %s", station.State())
+	if station.Status() != devices.StateStopped {
+		t.Errorf("expected state Stopped, got %s", station.Status())
 	}
 }
 
@@ -192,7 +192,7 @@ func TestStation_State(t *testing.T) {
 	station.Initialize()
 	station.Tick()
 
-	state := station.State()
+	state := station.Status()
 
 	if state.ID != "weather-station-001" {
 		t.Errorf("expected ID weather-station-001, got %s", state.ID)
@@ -235,7 +235,7 @@ func TestStation_PublishWithoutInterface(t *testing.T) {
 	// Should not panic even without interface
 	station.Tick()
 
-	if station.State() != devices.StateRunning {
-		t.Errorf("expected state Running, got %s", station.State())
+	if station.Status() != devices.StateRunning {
+		t.Errorf("expected state Running, got %s", station.Status())
 	}
 }
