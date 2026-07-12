@@ -1,0 +1,218 @@
+# Engineering Verification Report (EVR-ACT-006)
+
+**Report ID:** EVR-ACT-006  
+**Action:** KDSE-ACT-006 - Fix Test Failures  
+**Date:** 2026-07-12  
+**Repository:** https://github.com/tamzrod/forge
+
+---
+
+## Executive Summary
+
+KDSE-ACT-006 (Fix Test Failures) has been identified as a priority action following AUDIT-2026-07-12. The test suite currently has 9+ failures that need to be resolved to restore CI/CD confidence.
+
+| Component | Status |
+|-----------|--------|
+| Test Failures Identified | ⚠️ 9+ failing |
+| Build Status | ✅ Passing |
+| CI/CD Status | ⚠️ Degraded |
+
+---
+
+## Test Failures Identified
+
+### 1. Build Failure: weatherstation Package
+
+**File:** `internal/devices/weatherstation/station_test.go`
+
+**Error:**
+```
+invalid operation: station.Status() != devices.StateInitialized 
+(mismatched types WeatherStationState and devices.State)
+```
+
+**Root Cause:** `WeatherStationState` type is used instead of `devices.State`
+
+**Impact:** Package won't compile, blocking CI/CD
+
+---
+
+### 2. Test Failure: Inspector Tests
+
+**Test:** `TestView_ClockState`
+
+**Errors:**
+```
+inspector_test.go:54: expected elapsed 5h, got 6h0m0s
+inspector_test.go:58: expected tick count 1, got 2
+```
+
+**Root Cause:** Time calculation or tick logic issue
+
+---
+
+**Test:** `TestView_InjectPower`
+
+**Error:**
+```
+inspector_test.go:229: expected frequency > 60 after injection, got 59.999900
+```
+
+**Root Cause:** Frequency threshold not met
+
+---
+
+### 3. Test Failures: Grid Model
+
+**Test:** `TestGrid_ReactivePowerInjectionChangesVoltage`
+
+**Errors:**
+```
+grid_test.go:50: expected voltage to rise from reactive injection, got 450.000000
+grid_test.go:60: expected voltage to drop from reactive absorption, got 520.000000
+```
+
+**Root Cause:** Grid voltage response not matching test expectations
+
+---
+
+**Test:** `TestGrid_ActivePowerInjectionChangesFrequency`
+
+**Errors:**
+```
+grid_test.go:82: expected frequency to rise from active injection, got 59.999900
+grid_test.go:92: expected frequency to drop from active load, got 60.000100
+```
+
+**Root Cause:** Frequency response outside tolerance
+
+---
+
+**Tests:** `TestGrid_IsStable`, `TestGrid_IsUnderVoltage`, `TestGrid_IsOverFrequency`
+
+**Root Cause:** Threshold comparisons failing
+
+---
+
+**Test:** `TestGrid_VoltagePU`
+
+**Error:**
+```
+expected voltage PU 0.5 at 240V, got 0.937500
+```
+
+**Root Cause:** Per-unit calculation mismatch
+
+---
+
+### 4. Test Failure: CRC16
+
+**Test:** `TestCRC16`
+
+**Errors:**
+```
+protocol_test.go:93: crc16([1 2]) = 0xe181, want 0x6a31
+protocol_test.go:93: crc16([255 255]) = 0xf0f8, want 0x0000
+```
+
+**Root Cause:** CRC16 algorithm implementation differs from expected values
+
+---
+
+## Test Coverage Summary
+
+| Package | Coverage | Status |
+|---------|----------|--------|
+| runtime | 47.5% | ⚠️ Low |
+| memory | 79.4% | ✅ Good |
+| models | 83.5% | ✅ Good |
+| scheduler | 66.3% | ⚠️ Medium |
+| internal/devices | 88.1% | ✅ Good |
+| internal/models/grid | 91.1% | ✅ Good |
+| internal/models/weather | 96.8% | ✅ Excellent |
+| internal/models/sun | 95.5% | ✅ Excellent |
+| **Average** | **~76%** | ⚠️ Medium |
+
+---
+
+## Recommended Fixes
+
+### Fix 1: WeatherStation Type Mismatch
+
+**Action:** Update `station_test.go` to use correct state type or cast appropriately
+
+```go
+// Current (incorrect):
+if station.Status() != devices.StateInitialized {
+
+// Fixed:
+state := devices.State(station.Status())
+if state != devices.StateInitialized {
+```
+
+---
+
+### Fix 2: Inspector Time Tests
+
+**Action:** Review clock advancement logic and update test expectations
+
+**Possible issues:**
+- Tick interval configuration
+- Initial tick behavior
+- Time accumulation logic
+
+---
+
+### Fix 3: Grid Model Tests
+
+**Action:** Review grid model physics implementation
+
+**Considerations:**
+- Voltage response curve
+- Frequency damping
+- Tolerance adjustments
+- Per-unit base calculation
+
+---
+
+### Fix 4: CRC16 Implementation
+
+**Action:** Verify CRC16 implementation against Modbus standard
+
+**Standard:** CRC-16/Modbus uses polynomial 0xA001 with initial value 0xFFFF
+
+---
+
+## Impact on Audit Scores
+
+| Dimension | Current | After Fix |
+|-----------|---------|----------|
+| Verification | 60% | 85% |
+| Process | 65% | 75% |
+| Overall | 70% | 75% |
+
+---
+
+## Next Steps
+
+1. Investigate root causes of each test failure
+2. Fix weatherstation build failure first (blocking)
+3. Review and update test expectations if physics model changed
+4. Verify CRC16 implementation against standard
+5. Run full test suite to confirm all tests pass
+6. Update EVR with verification results
+
+---
+
+## Conclusion
+
+KDSE-ACT-006 is required to restore the test suite to a passing state. The failures indicate either:
+1. Code changes that weren't reflected in tests
+2. Test expectations that need updating
+3. Bugs introduced in recent changes
+
+Immediate action needed before CI/CD can be considered healthy.
+
+---
+
+*Report generated by KDSE Runtime (Engineering Verification)*
