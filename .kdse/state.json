@@ -1,0 +1,91 @@
+{
+  "session_id": "KDSE-RT-2026-07-12-104718",
+  "repository": {
+    "path": "/workspace/project/forge",
+    "name": "forge",
+    "phase": "Structured",
+    "artifacts": [
+      "LICENSE",
+      "README.md",
+      "docs",
+      "docs/adrs",
+      "docs/architecture",
+      "docs/development",
+      "docs/examples",
+      "docs/ui",
+      "go.mod"
+    ],
+    "is_git_repo": true
+  },
+  "phase": "Structured",
+  "state": "Idle",
+  "started_at": "2026-07-12T10:47:18Z",
+  "updated_at": "2026-07-12T10:47:18Z",
+  "artifacts": [
+    "LICENSE",
+    "README.md",
+    "docs",
+    "docs/adrs",
+    "docs/architecture",
+    "docs/development",
+    "docs/examples",
+    "docs/ui",
+    "go.mod"
+  ],
+  "dimensions": {
+    "Architecture Artifacts": 2,
+    "Authority Hierarchy": 7,
+    "Governance": 3,
+    "Implementation Artifacts": 2,
+    "Knowledge Artifacts": 4,
+    "Traceability": 2,
+    "Verification Practices": 2
+  },
+  "findings": [
+    {
+      "id": "F003",
+      "severity": "Medium",
+      "dimension": "Architecture Artifacts",
+      "title": "Dimension below threshold",
+      "details": "This dimension requires attention to reach target maturity"
+    },
+    {
+      "id": "F003",
+      "severity": "Medium",
+      "dimension": "Implementation Artifacts",
+      "title": "Dimension below threshold",
+      "details": "This dimension requires attention to reach target maturity"
+    },
+    {
+      "id": "F003",
+      "severity": "Medium",
+      "dimension": "Verification Practices",
+      "title": "Dimension below threshold",
+      "details": "This dimension requires attention to reach target maturity"
+    },
+    {
+      "id": "F003",
+      "severity": "Medium",
+      "dimension": "Traceability",
+      "title": "Dimension below threshold",
+      "details": "This dimension requires attention to reach target maturity"
+    },
+    {
+      "id": "F003",
+      "severity": "Medium",
+      "dimension": "Governance",
+      "title": "Dimension below threshold",
+      "details": "This dimension requires attention to reach target maturity"
+    }
+  ],
+  "recommendations": [
+    {
+      "id": "KDSE-ACT-001",
+      "action": "Improve Verification Practices dimension",
+      "dimension": "Verification Practices",
+      "impact": 1,
+      "priority": "High",
+      "rationale": "This dimension has the lowest score and represents the highest-value improvement opportunity"
+    }
+  ]
+}
