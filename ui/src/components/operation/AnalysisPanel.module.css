@@ -1,0 +1,279 @@
+.panel {
+  height: 100%;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6e6e6e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+/* Timeline Tab */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timelineItem {
+  background: #1e1e1e;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.timelineIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #3c3c3c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.timelineIcon.sunrise {
+  background: linear-gradient(135deg, #ff9800, #ffb74d);
+}
+
+.timelineIcon.sunset {
+  background: linear-gradient(135deg, #ff5722, #ff8a65);
+}
+
+.timelineIcon.alarm {
+  background: linear-gradient(135deg, #f44336, #ef5350);
+}
+
+.timelineIcon.info {
+  background: linear-gradient(135deg, #2196f3, #42a5f5);
+}
+
+.timelineContent {
+  flex: 1;
+}
+
+.timelineTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.timelineDescription {
+  font-size: 12px;
+  color: #9d9d9d;
+  line-height: 1.4;
+}
+
+.timelineTime {
+  font-size: 11px;
+  color: #6e6e6e;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+/* Events Tab */
+.events {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event {
+  background: #1e1e1e;
+  border-radius: 6px;
+  padding: 12px;
+  border-left: 3px solid #6e6e6e;
+}
+
+.event.critical {
+  border-left-color: #f44336;
+}
+
+.event.warning {
+  border-left-color: #ff9800;
+}
+
+.event.info {
+  border-left-color: #2196f3;
+}
+
+.event.success {
+  border-left-color: #4caf50;
+}
+
+.eventHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.eventType {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #3c3c3c;
+  color: #d4d4d4;
+}
+
+.eventType.critical {
+  background: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+}
+
+.eventType.warning {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+}
+
+.eventType.info {
+  background: rgba(33, 150, 243, 0.2);
+  color: #2196f3;
+}
+
+.eventType.success {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.eventTimestamp {
+  font-size: 10px;
+  color: #6e6e6e;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+.eventMessage {
+  font-size: 12px;
+  color: #d4d4d4;
+  line-height: 1.4;
+}
+
+.eventSource {
+  font-size: 11px;
+  color: #6e6e6e;
+  margin-top: 6px;
+}
+
+/* Why Tab */
+.why {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.whyCard {
+  background: #1e1e1e;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.whyCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.whyCardIcon {
+  font-size: 16px;
+}
+
+.whyCardTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+}
+
+.whyCardContent {
+  font-size: 12px;
+  color: #9d9d9d;
+  line-height: 1.6;
+}
+
+.whyInsight {
+  background: rgba(255, 111, 0, 0.1);
+  border: 1px solid rgba(255, 111, 0, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.whyInsightTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ff9800;
+  margin-bottom: 6px;
+}
+
+.whyInsightContent {
+  font-size: 12px;
+  color: #d4d4d4;
+  line-height: 1.5;
+}
+
+.whyHighlight {
+  background: rgba(255, 111, 0, 0.2);
+  color: #ffb74d;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+/* Empty State */
+.empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: #6e6e6e;
+}
+
+.emptyIcon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.emptyText {
+  font-size: 12px;
+}
+
+/* Stats */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.statValue {
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+.statLabel {
+  font-size: 10px;
+  color: #6e6e6e;
+  margin-top: 4px;
+}

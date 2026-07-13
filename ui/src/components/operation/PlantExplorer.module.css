@@ -1,0 +1,167 @@
+.explorer {
+  height: 100%;
+}
+
+.tree {
+  margin-top: 8px;
+}
+
+.nodeWrapper {
+  user-select: none;
+}
+
+.node {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  gap: 6px;
+}
+
+.node:hover {
+  background: #2d2d2d;
+}
+
+.node.selected {
+  background: #094771;
+}
+
+.expandIcon {
+  width: 16px;
+  font-size: 10px;
+  color: #6e6e6e;
+  text-align: center;
+}
+
+.nodeIcon {
+  font-size: 14px;
+}
+
+.nodeLabel {
+  font-size: 13px;
+  color: #d4d4d4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.children {
+  margin-left: 8px;
+}
+
+/* Environment Section - special styling */
+.environmentSection .nodeLabel {
+  color: #6e6e6e;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Sun Status Card */
+.sunCard {
+  background: #1e1e1e;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.sunHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sunIcon {
+  font-size: 20px;
+}
+
+.sunTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+}
+
+.sunStatus {
+  font-size: 11px;
+  color: #4caf50;
+}
+
+.sunStatus.night {
+  color: #6e6e6e;
+}
+
+.sunMetrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sunMetric {
+  background: #252526;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.sunMetricLabel {
+  font-size: 10px;
+  color: #6e6e6e;
+  margin-bottom: 4px;
+}
+
+.sunMetricValue {
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+}
+
+/* Weather Card */
+.weatherCard {
+  background: #1e1e1e;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.weatherHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.weatherIcon {
+  font-size: 20px;
+}
+
+.weatherTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+}
+
+.weatherMetrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.weatherMetric {
+  background: #252526;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.weatherMetricLabel {
+  font-size: 10px;
+  color: #6e6e6e;
+  margin-bottom: 4px;
+}
+
+.weatherMetricValue {
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+}

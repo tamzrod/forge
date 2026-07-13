@@ -1,0 +1,341 @@
+.details {
+  height: 100%;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #6e6e6e;
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.emptyText {
+  font-size: 14px;
+}
+
+/* Header */
+.header {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.headerIcon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.headerTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.headerSubtitle {
+  font-size: 12px;
+  color: #6e6e6e;
+}
+
+/* Sections */
+.section {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6e6e6e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+/* Property Grid */
+.propertyGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.property {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.propertyLabel {
+  font-size: 10px;
+  color: #6e6e6e;
+  margin-bottom: 4px;
+}
+
+.propertyValue {
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+.propertyUnit {
+  font-size: 11px;
+  color: #6e6e6e;
+  margin-left: 4px;
+}
+
+/* Explain Card */
+.explainCard {
+  background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.explainHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.explainIcon {
+  font-size: 20px;
+}
+
+.explainTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+}
+
+.explainContent {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.5;
+}
+
+/* Measurement Cards */
+.measurementCard {
+  background: #1e1e1e;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-left: 3px solid #4caf50;
+}
+
+.measurementCard.warning {
+  border-left-color: #ff9800;
+}
+
+.measurementCard.error {
+  border-left-color: #f44336;
+}
+
+.measurementHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.measurementName {
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+}
+
+.measurementValue {
+  font-size: 16px;
+  font-weight: 600;
+  color: #4caf50;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+.measurementValue.warning {
+  color: #ff9800;
+}
+
+.measurementValue.error {
+  color: #f44336;
+}
+
+.measurementUnit {
+  font-size: 11px;
+  color: #6e6e6e;
+  margin-left: 4px;
+}
+
+.measurementBar {
+  height: 4px;
+  background: #3c3c3c;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.measurementBarFill {
+  height: 100%;
+  background: #4caf50;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.measurementBarFill.warning {
+  background: #ff9800;
+}
+
+.measurementBarFill.error {
+  background: #f44336;
+}
+
+/* Input Field */
+.inputGroup {
+  margin-bottom: 12px;
+}
+
+.inputLabel {
+  font-size: 11px;
+  color: #6e6e6e;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.inputField {
+  width: 100%;
+  background: #3c3c3c;
+  border: 1px solid #4c4c4c;
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: white;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  transition: border-color 0.15s ease;
+}
+
+.inputField:focus {
+  outline: none;
+  border-color: #ff6f00;
+}
+
+.inputField:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inputFieldWithUnit {
+  display: flex;
+  align-items: center;
+}
+
+.inputFieldWithUnit .inputField {
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+}
+
+.inputUnit {
+  background: #4c4c4c;
+  border: 1px solid #4c4c4c;
+  border-radius: 0 4px 4px 0;
+  padding: 8px 12px;
+  color: #9d9d9d;
+  font-size: 12px;
+}
+
+/* Status Indicator */
+.statusIndicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #1e1e1e;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.statusDot.online {
+  background: #4caf50;
+}
+
+.statusDot.offline {
+  background: #f44336;
+}
+
+.statusDot.warning {
+  background: #ff9800;
+}
+
+.statusText {
+  font-size: 12px;
+  color: #d4d4d4;
+}
+
+/* Why Explanation */
+.whyBox {
+  background: #1e1e1e;
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.whyHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: #ff6f00;
+  font-weight: 500;
+}
+
+.whyContent {
+  font-size: 13px;
+  color: #d4d4d4;
+  line-height: 1.6;
+}
+
+.whyHighlight {
+  background: rgba(255, 111, 0, 0.2);
+  color: #ff9800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+/* List Items */
+.listItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.listItem:last-child {
+  border-bottom: none;
+}
+
+.listLabel {
+  font-size: 12px;
+  color: #9d9d9d;
+}
+
+.listValue {
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
