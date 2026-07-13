@@ -124,6 +124,34 @@ func (r *Runtime) CreateWeatherModel(id models.ModelID) *models.WeatherModel {
 	return m
 }
 
+// CreateBusModel creates a new Bus model.
+func (r *Runtime) CreateBusModel(id models.ModelID, nominalV float32) *models.BusModel {
+	m := models.NewBusModel(id, nominalV)
+	r.CreateModel(m)
+	return m
+}
+
+// CreateTransformerModel creates a new Transformer model.
+func (r *Runtime) CreateTransformerModel(id models.ModelID, from, to models.ModelID) *models.TransformerModel {
+	m := models.NewTransformerModel(id, from, to)
+	r.CreateModel(m)
+	return m
+}
+
+// CreateLoadModel creates a new Load model.
+func (r *Runtime) CreateLoadModel(id models.ModelID, bus models.ModelID, baseLoad float32) *models.LoadModel {
+	m := models.NewLoadModel(id, bus, baseLoad)
+	r.CreateModel(m)
+	return m
+}
+
+// CreateBreakerModel creates a new Breaker model.
+func (r *Runtime) CreateBreakerModel(id models.ModelID, bus1, bus2 models.ModelID) *models.BreakerModel {
+	m := models.NewBreakerModel(id, bus1, bus2)
+	r.CreateModel(m)
+	return m
+}
+
 // CreateReservoirModel creates a new Reservoir model.
 func (r *Runtime) CreateReservoirModel(id models.ModelID, area float32) *models.ReservoirModel {
 	m := models.NewReservoirModel(id, area)

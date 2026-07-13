@@ -441,6 +441,274 @@ func (r *ReservoirModel) Tick() {
 	r.flowOut = 0
 }
 
+// BusModel represents an electrical bus (node) in the power system.
+// It holds voltage, angle, and aggregates power injections/withdrawals.
+type BusModel struct {
+	ModelBase
+
+	// Electrical state
+	voltage      float32 // PU voltage (1.0 = nominal)
+	angle        float32 // Voltage angle in degrees
+	nominalV     float32 // Nominal voltage in volts
+
+	// Power balance
+	powerInjection float32 // Total generation (MW)
+	powerWithdraw  float32 // Total load (MW)
+
+	// Connectivity
+	connectedDevices []ModelID
+}
+
+// NewBusModel creates a new Bus model.
+func NewBusModel(id ModelID, nominalV float32) *BusModel {
+	return &BusModel{
+		ModelBase: NewModelBase(id, "bus"),
+		voltage:   1.0,
+		angle:     0.0,
+		nominalV:  nominalV,
+	}
+}
+
+// Voltage returns the per-unit voltage.
+func (b *BusModel) Voltage() float32 {
+	return b.voltage
+}
+
+// Angle returns the voltage angle in degrees.
+func (b *BusModel) Angle() float32 {
+	return b.angle
+}
+
+// ActualVoltage returns the actual voltage in volts.
+func (b *BusModel) ActualVoltage() float32 {
+	return b.voltage * b.nominalV
+}
+
+// InjectPower adds power injection (generation).
+func (b *BusModel) InjectPower(mw float32) {
+	b.powerInjection += mw
+}
+
+// PowerInjection returns the current power injection in MW.
+func (b *BusModel) PowerInjection() float32 {
+	return b.powerInjection
+}
+
+// WithdrawPower adds power withdrawal (load).
+func (b *BusModel) WithdrawPower(mw float32) {
+	b.powerWithdraw += mw
+}
+
+// Tick updates bus state based on power balance.
+func (b *BusModel) Tick() {
+	// Calculate power imbalance
+	netPower := b.powerInjection - b.powerWithdraw
+
+	// Voltage regulation: voltage drops when load exceeds generation
+	// and rises when generation exceeds load (simplified droop)
+	voltageDelta := netPower * 0.001 // 0.1% per MW
+	b.voltage += voltageDelta
+	b.voltage = clamp(b.voltage, 0.9, 1.1) // ±10% band
+
+	// Angle changes based on power flow (simplified)
+	angleDelta := netPower * 0.01
+	b.angle += angleDelta
+	if b.angle > 180 {
+		b.angle -= 360
+	}
+	if b.angle < -180 {
+		b.angle += 360
+	}
+
+	// Reset for next tick
+	b.powerInjection = 0
+	b.powerWithdraw = 0
+}
+
+// TransformerModel represents a power transformer.
+// It models voltage transformation and power flow between buses.
+type TransformerModel struct {
+	ModelBase
+
+	// Transformer parameters
+	ratio      float32 // Tap ratio (PU, typically 0.9-1.1)
+	impedance  float32 // Series impedance (PU)
+	phaseShift float32 // Phase shift in degrees
+
+	// Connected buses
+	fromBus ModelID
+	toBus   ModelID
+
+	// State
+	loading     float32 // Current loading (PU)
+	powerFlow   float32 // Power flowing through (MW)
+}
+
+// NewTransformerModel creates a new Transformer model.
+func NewTransformerModel(id ModelID, from, to ModelID) *TransformerModel {
+	return &TransformerModel{
+		ModelBase: NewModelBase(id, "transformer"),
+		ratio:     1.0,
+		impedance: 0.05,
+		phaseShift: 0,
+		fromBus:   from,
+		toBus:     to,
+		loading:   0,
+		powerFlow: 0,
+	}
+}
+
+// Ratio returns the tap ratio.
+func (t *TransformerModel) Ratio() float32 {
+	return t.ratio
+}
+
+// SetRatio sets the tap ratio (for LTC control).
+func (t *TransformerModel) SetRatio(r float32) {
+	t.ratio = clamp(r, 0.9, 1.1)
+}
+
+// Loading returns the transformer loading in PU.
+func (t *TransformerModel) Loading() float32 {
+	return t.loading
+}
+
+// PowerFlow returns the power flowing through in MW.
+func (t *TransformerModel) PowerFlow() float32 {
+	return t.powerFlow
+}
+
+// From returns the "from" bus ID.
+func (t *TransformerModel) From() ModelID {
+	return t.fromBus
+}
+
+// To returns the "to" bus ID.
+func (t *TransformerModel) To() ModelID {
+	return t.toBus
+}
+
+// Tick updates transformer state.
+func (t *TransformerModel) Tick() {
+	// Simplified power flow calculation
+	// P = V1 * V2 / X * sin(δ1 - δ2)
+	// Simplified: just track loading based on ratio deviation
+	t.loading = 1.0 / t.ratio
+
+	// Reset
+	t.powerFlow = 0
+}
+
+// LoadModel represents an electrical load.
+type LoadModel struct {
+	ModelBase
+
+	// Load parameters
+	baseLoad   float32 // Base load in MW
+	alpha      float32 // Voltage exponent (0.5-1.5 typical)
+	beta       float32 // Frequency exponent
+
+	// Dynamic load
+	currentLoad float32 // Current load after voltage/frequency effects
+	busID       ModelID // Connected bus
+}
+
+// NewLoadModel creates a new Load model.
+func NewLoadModel(id ModelID, bus ModelID, baseLoad float32) *LoadModel {
+	return &LoadModel{
+		ModelBase:   NewModelBase(id, "load"),
+		baseLoad:    baseLoad,
+		alpha:       0.8,
+		beta:        1.0,
+		currentLoad: baseLoad,
+		busID:       bus,
+	}
+}
+
+// CurrentLoad returns the current load in MW.
+func (l *LoadModel) CurrentLoad() float32 {
+	return l.currentLoad
+}
+
+// BusID returns the connected bus ID.
+func (l *LoadModel) BusID() ModelID {
+	return l.busID
+}
+
+// Tick updates load based on time.
+func (l *LoadModel) Tick() {
+	// Base load with small random variation
+	delta := (float32(random()) - 0.5) * l.baseLoad * 0.05
+	l.currentLoad = l.baseLoad + delta
+	l.currentLoad = clamp(l.currentLoad, l.baseLoad*0.5, l.baseLoad*1.5)
+}
+
+// BreakerModel represents a circuit breaker.
+type BreakerModel struct {
+	ModelBase
+
+	// State
+	isOpen bool
+
+	// Connected elements
+	bus1 ModelID
+	bus2 ModelID
+
+	// Status
+	tripCount    uint32
+	lastTripTime time.Time
+}
+
+// NewBreakerModel creates a new Breaker model.
+func NewBreakerModel(id ModelID, bus1, bus2 ModelID) *BreakerModel {
+	return &BreakerModel{
+		ModelBase: NewModelBase(id, "breaker"),
+		isOpen:    false,
+		bus1:      bus1,
+		bus2:      bus2,
+	}
+}
+
+// IsOpen returns true if breaker is open.
+func (b *BreakerModel) IsOpen() bool {
+	return b.isOpen
+}
+
+// Open opens the breaker.
+func (b *BreakerModel) Open() {
+	if !b.isOpen {
+		b.isOpen = true
+		b.tripCount++
+		b.lastTripTime = time.Now()
+	}
+}
+
+// Close closes the breaker.
+func (b *BreakerModel) Close() {
+	b.isOpen = false
+}
+
+// Bus1 returns the first connected bus.
+func (b *BreakerModel) Bus1() ModelID {
+	return b.bus1
+}
+
+// Bus2 returns the second connected bus.
+func (b *BreakerModel) Bus2() ModelID {
+	return b.bus2
+}
+
+// TripCount returns the number of trips.
+func (b *BreakerModel) TripCount() uint32 {
+	return b.tripCount
+}
+
+// Tick checks for fault conditions (simplified).
+func (b *BreakerModel) Tick() {
+	// Auto-trip on overcurrent (would need current measurement)
+	// For now, this is just a manual control interface
+}
+
 // Helper function to clamp values
 func clamp(v, min, max float32) float32 {
 	if v < min {
