@@ -8,6 +8,7 @@ import (
 
 	"github.com/tamzrod/forge/device"
 	"github.com/tamzrod/forge/models"
+	"github.com/tamzrod/forge/simulation"
 )
 
 // Scheduler advances simulation time and tells devices to tick.
@@ -16,25 +17,9 @@ type Scheduler struct {
 	devices     []*device.Device
 	models      []models.Model
 	tickInterval time.Duration
-	clock        SimulationClock
+	clock        simulation.Clock
 	running      bool
 	stopCh       chan struct{}
-}
-
-// SimulationClock tracks elapsed simulation time.
-type SimulationClock struct {
-	elapsed   time.Duration
-	tickCount uint64
-}
-
-// Elapsed returns the total elapsed simulation time.
-func (c SimulationClock) Elapsed() time.Duration {
-	return c.elapsed
-}
-
-// TickCount returns the number of ticks executed.
-func (c SimulationClock) TickCount() uint64 {
-	return c.tickCount
 }
 
 // New creates a new Scheduler.
@@ -43,13 +28,24 @@ func New(tickInterval time.Duration) *Scheduler {
 		devices:     make([]*device.Device, 0),
 		models:      make([]models.Model, 0),
 		tickInterval: tickInterval,
-		clock: SimulationClock{
-			elapsed:   0,
-			tickCount: 0,
-		},
+		clock:        simulation.NewClock(),
 		running: false,
 		stopCh:  make(chan struct{}),
 	}
+}
+
+// SetClock sets a custom simulation clock.
+func (s *Scheduler) SetClock(clock simulation.Clock) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.clock = clock
+}
+
+// Clock returns the current simulation clock.
+func (s *Scheduler) Clock() simulation.Clock {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.clock
 }
 
 // AddDevice adds a device to the scheduler.
@@ -179,14 +175,14 @@ func (s *Scheduler) Stop() {
 func (s *Scheduler) Pause() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.running = false
+	s.clock.Pause()
 }
 
 // Resume resumes the scheduler.
 func (s *Scheduler) Resume() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.running = true
+	s.clock.Resume()
 }
 
 // Running returns true if the scheduler is running.
@@ -208,6 +204,7 @@ func (s *Scheduler) tick() {
 	copy(devices, s.devices)
 	models := make([]models.Model, len(s.models))
 	copy(models, s.models)
+	clock := s.clock
 	s.mu.Unlock()
 
 	// 1. Devices read models and SET power injections/withdrawals
@@ -224,18 +221,8 @@ func (s *Scheduler) tick() {
 		m.Tick()
 	}
 
-	// 3. Advance the clock
-	s.mu.Lock()
-	s.clock.elapsed += s.tickInterval
-	s.clock.tickCount++
-	s.mu.Unlock()
-}
-
-// Clock returns the current simulation clock.
-func (s *Scheduler) Clock() SimulationClock {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.clock
+	// 3. Advance the simulation clock
+	clock.Update()
 }
 
 // TickInterval returns the configured tick interval.

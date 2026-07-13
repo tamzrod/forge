@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/tamzrod/forge/simulation"
 )
 
 // EntityID uniquely identifies an entity in the world.
@@ -47,6 +49,12 @@ type World interface {
 
 	// Time returns the current simulation time.
 	Time() time.Time
+
+	// Clock returns the simulation clock.
+	Clock() simulation.Clock
+
+	// SetClock sets the simulation clock.
+	SetClock(clock simulation.Clock)
 
 	// Close cleans up the world.
 	Close()
@@ -212,7 +220,7 @@ func (e *BaseEntity) Tick(dt time.Duration) {
 type simpleWorld struct {
 	mu       sync.RWMutex
 	entities map[EntityID]Entity
-	time     time.Time
+	clock    simulation.Clock
 	events   []Event
 	eventID  int
 }
@@ -221,7 +229,7 @@ type simpleWorld struct {
 func NewWorld() World {
 	return &simpleWorld{
 		entities: make(map[EntityID]Entity),
-		time:     time.Time{},
+		clock:    simulation.NewClock(),
 		events:   make([]Event, 0),
 	}
 }
@@ -268,7 +276,6 @@ func (w *simpleWorld) EntitiesByType(entityType string) []Entity {
 
 func (w *simpleWorld) Tick(dt time.Duration) {
 	w.mu.Lock()
-	w.time = w.time.Add(dt)
 	entities := make([]Entity, len(w.entities))
 	i := 0
 	for _, e := range w.entities {
@@ -342,7 +349,7 @@ func (w *simpleWorld) PublishEvent(evt Event) {
 	defer w.mu.Unlock()
 	evt.ID = fmt.Sprintf("evt-%d", w.eventID)
 	w.eventID++
-	evt.Time = w.time
+	evt.Time = w.Clock().Now()
 	w.events = append(w.events, evt)
 
 	// Dispatch event to entities
@@ -360,9 +367,19 @@ func (w *simpleWorld) Events() []Event {
 }
 
 func (w *simpleWorld) Time() time.Time {
+	return w.Clock().Now()
+}
+
+func (w *simpleWorld) Clock() simulation.Clock {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	return w.time
+	return w.clock
+}
+
+func (w *simpleWorld) SetClock(clock simulation.Clock) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.clock = clock
 }
 
 func (w *simpleWorld) Close() {

@@ -7,6 +7,7 @@ import (
 	"github.com/tamzrod/forge/memory"
 	"github.com/tamzrod/forge/runtime"
 	"github.com/tamzrod/forge/scheduler"
+	"github.com/tamzrod/forge/simulation"
 )
 
 // Re-export commonly used types.
@@ -32,8 +33,14 @@ type (
 	// Scheduler advances simulation time.
 	Scheduler = scheduler.Scheduler
 
-	// SimulationClock tracks elapsed time.
-	SimulationClock = scheduler.SimulationClock
+	// SimClock is the simulation clock.
+	SimClock = simulation.SimClock
+
+	// Clock is the simulation clock interface.
+	Clock = simulation.Clock
+
+	// Mode is the simulation mode.
+	Mode = simulation.Mode
 )
 
 // Quality constants.
@@ -42,6 +49,26 @@ const (
 	QualityUncertain = memory.QualityUncertain
 	QualityBad       = memory.QualityBad
 	QualityOffline   = memory.QualityOffline
+)
+
+// Simulation modes.
+const (
+	ModeRealtime  = simulation.ModeRealtime
+	ModeSimulated = simulation.ModeSimulated
+	ModeManual    = simulation.ModeManual
+	ModeReplay    = simulation.ModeReplay
+)
+
+// Simulation speeds.
+const (
+	SpeedRealtime   = simulation.SpeedRealtime
+	SpeedSlow      = simulation.SpeedSlow
+	SpeedFast      = simulation.SpeedFast
+	SpeedVeryFast  = simulation.SpeedVeryFast
+	SpeedUltraFast = simulation.SpeedUltraFast
+	SpeedExtreme   = simulation.SpeedExtreme
+	SpeedLudicrous = simulation.SpeedLudicrous
+	SpeedPlaid     = simulation.SpeedPlaid
 )
 
 // Memory errors.
