@@ -13,7 +13,8 @@ Topology                    Entities
 ├─ Buses                   ├─ Internal behavior
 ├─ Branches                ├─ Measurements
 ├─ Switches                ├─ State
-└─ Terminals               └─ Event handling
+├─ Terminals               └─ Event handling
+└─ Connections
 ```
 
 Topology knows **what connects to what**. Entities know **how they work**.
@@ -57,20 +58,44 @@ Properties:
 
 ### Terminal
 
-A **Terminal** is a connection point on an entity.
+A **Terminal** is a typed connection point on an entity.
 
 ```go
 type Terminal struct {
-    ID       ID
-    EntityID world.EntityID  // Owner entity
-    Name     string          // e.g., "primary", "secondary"
+    ID        ID
+    EntityID  world.EntityID
+    Name      string           // e.g., "primary", "secondary", "output", "input"
+    Role      TerminalRole     // Source, Destination, Through, Observation
+    Type      TerminalType     // HV, LV, Grid
+    Voltage   float32          // V
+    bus       *Bus             // Connected bus
 }
+
+type TerminalRole int
+const (
+    TerminalRoleSource TerminalRole = iota  // Injects power
+    TerminalRoleDestination                 // Withdraws power
+    TerminalRoleThrough                     // Passes power through
+    TerminalRoleObservation                 // Measures without affecting
+)
+
+type TerminalType int
+const (
+    TerminalTypeHV TerminalType = iota  // High voltage
+    TerminalTypeLV                      // Low voltage
+    TerminalTypeGrid                    // Utility grid
+)
 ```
 
-Properties:
-- Each entity can have multiple terminals
-- Terminals connect entities to buses
-- Example: A breaker has "line" and "load" terminals
+Terminal Role by Entity:
+
+| Entity | Required Role |
+|--------|--------------|
+| VirtualGenerator | Source |
+| VirtualLoad | Destination |
+| VirtualMeter | Observation |
+| Transformer | Through (HV and LV) |
+| Breaker | Through (optional) |
 
 ### Switch
 
@@ -98,7 +123,46 @@ type Network struct {
     buses    map[ID]*Bus
     branches map[ID]*Branch
     switches map[ID]*Switch
+    terminals map[ID]*Terminal
 }
+```
+
+## Connection Types
+
+### Source Connection
+
+A source terminal injects power into the network.
+
+```
+VirtualGenerator
+  └── Terminal "output" (Source, LV, 480V)
+            │
+            ▼
+        480V Bus
+```
+
+### Destination Connection
+
+A destination terminal withdraws power from the network.
+
+```
+480V Bus
+    │
+    ▼
+VirtualLoad
+  └── Terminal "input" (Destination, LV, 480V)
+```
+
+### Observation Connection
+
+An observation terminal measures power without affecting the network.
+
+```
+69kV Bus
+    │
+    ▼
+VirtualMeter
+  └── Terminal "meter" (Observation, HV, 69kV)
 ```
 
 ## Responsibilities
@@ -112,6 +176,7 @@ type Network struct {
 | Network traversal | Finding paths between buses |
 | Island detection | Identifying disconnected subgraphs |
 | Connected components | Grouping related elements |
+| Connection validation | Terminal-bus compatibility |
 
 ### Entities Own
 
@@ -323,12 +388,19 @@ connected := net.EntitiesConnectedTo(hvBus)
 |------|------------|
 | Bus | Electrical node where conductors connect |
 | Branch | Connection between two buses |
-| Terminal | Connection point on an entity |
+| Terminal | Typed connection point on an entity |
+| Terminal Role | Source, Destination, Through, Observation |
+| Terminal Type | HV, LV, Grid |
 | Switch | Device that interrupts current (breaker) |
 | Island | Disconnected subgraph of the network |
 | Upstream | Toward sources (generators) |
 | Downstream | Away from sources (loads) |
+| Source Terminal | Terminal that injects power into network |
+| Destination Terminal | Terminal that withdraws power from network |
+| Observation Terminal | Terminal that measures without affecting network |
 
 ---
+
+*See also: [Electrical Connections Knowledge Base](electrical-connections.md)*
 
 *Last Updated: 2026-07-13*

@@ -71,6 +71,7 @@ func (b *Builder) AddTransformer(id ID, name string, highBusID, lowBusID ID, rat
 }
 
 // ConnectEntity connects an entity to a bus with a terminal.
+// This is a convenience method that infers terminal role from entity name patterns.
 func (b *Builder) ConnectEntity(entityID world.EntityID, busID ID, terminalName string) *Builder {
 	bus := b.network.Bus(busID)
 	if bus == nil {
@@ -78,7 +79,7 @@ func (b *Builder) ConnectEntity(entityID world.EntityID, busID ID, terminalName 
 	}
 
 	terminalID := ID(string(entityID) + "-" + terminalName)
-	terminal := NewTerminal(terminalID, entityID, terminalName)
+	terminal := NewTerminal(terminalID, entityID, terminalName, TerminalRoleSource, TerminalTypeLV, bus.NominalVoltage)
 	terminal.bus = bus
 	bus.AddTerminal(terminal)
 	b.network.AddTerminal(terminal)
@@ -86,31 +87,75 @@ func (b *Builder) ConnectEntity(entityID world.EntityID, busID ID, terminalName 
 	return b
 }
 
-// ConnectEntityToBreaker connects an entity through a breaker.
-func (b *Builder) ConnectEntityToBreaker(entityID world.EntityID, breakerID ID, busID ID, terminalName string, side string) *Builder {
+// ConnectGenerator connects a generator to a bus.
+func (b *Builder) ConnectGenerator(entityID world.EntityID, busID ID, terminalName string) *Builder {
 	bus := b.network.Bus(busID)
-	breaker := b.network.Switch(breakerID)
-	if bus == nil || breaker == nil || breaker.branch == nil {
+	if bus == nil {
 		return b
 	}
 
-	terminalID := ID(string(entityID) + "-" + terminalName + "-" + side)
-	terminal := NewTerminal(terminalID, entityID, terminalName+"-"+side)
+	terminalID := ID(string(entityID) + "-" + terminalName)
+	terminal := NewSourceTerminal(terminalID, entityID, terminalName, bus.NominalVoltage)
+	terminal.bus = bus
+	bus.AddTerminal(terminal)
+	b.network.AddTerminal(terminal)
 
-	// Determine which bus the terminal connects to based on side
-	var targetBus *Bus
-	if side == "from" && breaker.branch.FromBus == bus {
-		targetBus = bus
-	} else if side == "to" && breaker.branch.ToBus == bus {
-		targetBus = bus
-	} else {
-		// Connect to whichever bus matches
-		targetBus = bus
+	return b
+}
+
+// ConnectLoad connects a load to a bus.
+func (b *Builder) ConnectLoad(entityID world.EntityID, busID ID, terminalName string) *Builder {
+	bus := b.network.Bus(busID)
+	if bus == nil {
+		return b
 	}
 
-	terminal.bus = targetBus
-	targetBus.AddTerminal(terminal)
+	terminalID := ID(string(entityID) + "-" + terminalName)
+	terminal := NewDestinationTerminal(terminalID, entityID, terminalName, bus.NominalVoltage)
+	terminal.bus = bus
+	bus.AddTerminal(terminal)
 	b.network.AddTerminal(terminal)
+
+	return b
+}
+
+// ConnectMeter connects a meter to a bus.
+func (b *Builder) ConnectMeter(entityID world.EntityID, busID ID, terminalName string) *Builder {
+	bus := b.network.Bus(busID)
+	if bus == nil {
+		return b
+	}
+
+	terminalID := ID(string(entityID) + "-" + terminalName)
+	terminal := NewObservationTerminal(terminalID, entityID, terminalName, bus.NominalVoltage)
+	terminal.bus = bus
+	bus.AddTerminal(terminal)
+	b.network.AddTerminal(terminal)
+
+	return b
+}
+
+// ConnectThrough connects a through entity (transformer) between two buses.
+func (b *Builder) ConnectThrough(entityID world.EntityID, hvBusID, lvBusID ID, hvTerminalName, lvTerminalName string) *Builder {
+	hvBus := b.network.Bus(hvBusID)
+	lvBus := b.network.Bus(lvBusID)
+	if hvBus == nil || lvBus == nil {
+		return b
+	}
+
+	// Create HV terminal
+	hvTerminalID := ID(string(entityID) + "-" + hvTerminalName)
+	hvTerminal := NewThroughTerminal(hvTerminalID, entityID, hvTerminalName, TerminalTypeHV, hvBus.NominalVoltage)
+	hvTerminal.bus = hvBus
+	hvBus.AddTerminal(hvTerminal)
+	b.network.AddTerminal(hvTerminal)
+
+	// Create LV terminal
+	lvTerminalID := ID(string(entityID) + "-" + lvTerminalName)
+	lvTerminal := NewThroughTerminal(lvTerminalID, entityID, lvTerminalName, TerminalTypeLV, lvBus.NominalVoltage)
+	lvTerminal.bus = lvBus
+	lvBus.AddTerminal(lvTerminal)
+	b.network.AddTerminal(lvTerminal)
 
 	return b
 }

@@ -9,6 +9,76 @@ import (
 	"github.com/tamzrod/forge/world"
 )
 
+// TerminalRole defines what a terminal does in the electrical network.
+type TerminalRole int
+
+const (
+	// TerminalRoleSource injects power into the network (generators).
+	TerminalRoleSource TerminalRole = iota
+	// TerminalRoleDestination withdraws power from the network (loads).
+	TerminalRoleDestination
+	// TerminalRoleThrough passes power through (transformers, cables).
+	TerminalRoleThrough
+	// TerminalRoleObservation measures power without affecting the network (meters).
+	TerminalRoleObservation
+)
+
+// String returns the terminal role as a string.
+func (r TerminalRole) String() string {
+	switch r {
+	case TerminalRoleSource:
+		return "Source"
+	case TerminalRoleDestination:
+		return "Destination"
+	case TerminalRoleThrough:
+		return "Through"
+	case TerminalRoleObservation:
+		return "Observation"
+	default:
+		return "Unknown"
+	}
+}
+
+// TerminalType defines the voltage classification of a terminal.
+type TerminalType int
+
+const (
+	// TerminalTypeHV is high voltage (> 1kV).
+	TerminalTypeHV TerminalType = iota
+	// TerminalTypeLV is low voltage (<= 1kV).
+	TerminalTypeLV
+	// TerminalTypeGrid is utility grid connection.
+	TerminalTypeGrid
+)
+
+// String returns the terminal type as a string.
+func (t TerminalType) String() string {
+	switch t {
+	case TerminalTypeHV:
+		return "HV"
+	case TerminalTypeLV:
+		return "LV"
+	case TerminalTypeGrid:
+		return "Grid"
+	default:
+		return "Unknown"
+	}
+}
+
+// VoltageLevelForTerminalType returns the voltage level for a terminal type.
+func VoltageLevelForTerminalType(t TerminalType) VoltageLevel {
+	switch t {
+	case TerminalTypeLV:
+		return VoltageLevelLow
+	case TerminalTypeHV:
+		return VoltageLevelMedium // Treat HV as medium for simplicity
+	case TerminalTypeGrid:
+		return VoltageLevelHigh // Grid is typically high voltage
+	default:
+		return VoltageLevelLow
+	}
+}
+
 // ID uniquely identifies a topology element.
 type ID string
 
@@ -103,22 +173,48 @@ func (b *Bus) ConnectedEntities() []world.EntityID {
 	return result
 }
 
-// Terminal represents a connection point on an entity.
-// Each entity can have multiple terminals (e.g., a breaker has two).
+// Terminal represents a typed connection point on an entity.
+// Each entity can have multiple terminals (e.g., a transformer has HV and LV).
 type Terminal struct {
 	ID       ID
 	EntityID world.EntityID
-	Name     string // e.g., "primary", "secondary", "line", "load"
+	Name     string // e.g., "primary", "secondary", "output", "input"
+	Role     TerminalRole  // Source, Destination, Through, Observation
+	Type     TerminalType  // HV, LV, Grid
+	Voltage  float32       // V - nominal voltage
 	bus      *Bus
 }
 
-// NewTerminal creates a new terminal.
-func NewTerminal(id ID, entityID world.EntityID, name string) *Terminal {
+// NewTerminal creates a new terminal with role and type.
+func NewTerminal(id ID, entityID world.EntityID, name string, role TerminalRole, terminalType TerminalType, voltage float32) *Terminal {
 	return &Terminal{
 		ID:       id,
 		EntityID: entityID,
 		Name:     name,
+		Role:     role,
+		Type:     terminalType,
+		Voltage:  voltage,
 	}
+}
+
+// NewSourceTerminal creates a new source terminal (for generators).
+func NewSourceTerminal(id ID, entityID world.EntityID, name string, voltage float32) *Terminal {
+	return NewTerminal(id, entityID, name, TerminalRoleSource, voltageToTerminalType(voltage), voltage)
+}
+
+// NewDestinationTerminal creates a new destination terminal (for loads).
+func NewDestinationTerminal(id ID, entityID world.EntityID, name string, voltage float32) *Terminal {
+	return NewTerminal(id, entityID, name, TerminalRoleDestination, voltageToTerminalType(voltage), voltage)
+}
+
+// NewObservationTerminal creates a new observation terminal (for meters).
+func NewObservationTerminal(id ID, entityID world.EntityID, name string, voltage float32) *Terminal {
+	return NewTerminal(id, entityID, name, TerminalRoleObservation, voltageToTerminalType(voltage), voltage)
+}
+
+// NewThroughTerminal creates a new through terminal (for transformers).
+func NewThroughTerminal(id ID, entityID world.EntityID, name string, terminalType TerminalType, voltage float32) *Terminal {
+	return NewTerminal(id, entityID, name, TerminalRoleThrough, terminalType, voltage)
 }
 
 // Bus returns the bus this terminal is connected to.
@@ -129,6 +225,48 @@ func (t *Terminal) Bus() *Bus {
 // IsConnected returns true if this terminal is connected to a bus.
 func (t *Terminal) IsConnected() bool {
 	return t.bus != nil
+}
+
+// IsSource returns true if this is a source terminal.
+func (t *Terminal) IsSource() bool {
+	return t.Role == TerminalRoleSource
+}
+
+// IsDestination returns true if this is a destination terminal.
+func (t *Terminal) IsDestination() bool {
+	return t.Role == TerminalRoleDestination
+}
+
+// IsThrough returns true if this is a through terminal.
+func (t *Terminal) IsThrough() bool {
+	return t.Role == TerminalRoleThrough
+}
+
+// IsObservation returns true if this is an observation terminal.
+func (t *Terminal) IsObservation() bool {
+	return t.Role == TerminalRoleObservation
+}
+
+// CanConnectTo returns true if this terminal can connect to the given bus.
+func (t *Terminal) CanConnectTo(bus *Bus) bool {
+	// Observation terminals can connect to any voltage
+	if t.Role == TerminalRoleObservation {
+		return true
+	}
+	// Through terminals (transformers) can connect to matching voltage
+	if t.Role == TerminalRoleThrough {
+		return t.Voltage == bus.NominalVoltage
+	}
+	// Source and Destination terminals must match voltage
+	return t.Voltage == bus.NominalVoltage
+}
+
+// voltageToTerminalType converts voltage to terminal type.
+func voltageToTerminalType(voltage float32) TerminalType {
+	if voltage >= 1000 {
+		return TerminalTypeHV
+	}
+	return TerminalTypeLV
 }
 
 // Branch represents a connection between two buses.
@@ -350,7 +488,7 @@ func (n *Network) Switch(id ID) *Switch {
 	return n.switches[id]
 }
 
-// AddTerminal adds a terminal to the network.
+// AddTerminal adds a terminal to the network (not connected).
 func (n *Network) AddTerminal(t *Terminal) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -361,6 +499,11 @@ func (n *Network) AddTerminal(t *Terminal) {
 func (n *Network) RemoveTerminal(id ID) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+	if t, ok := n.terminals[id]; ok {
+		if t.bus != nil {
+			t.bus.RemoveTerminal(id)
+		}
+	}
 	delete(n.terminals, id)
 }
 
@@ -369,6 +512,159 @@ func (n *Network) Terminal(id ID) *Terminal {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.terminals[id]
+}
+
+// Terminals returns all terminals.
+func (n *Network) Terminals() []*Terminal {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	result := make([]*Terminal, 0, len(n.terminals))
+	for _, t := range n.terminals {
+		result = append(result, t)
+	}
+	return result
+}
+
+// ConnectTerminal connects a terminal to a bus with validation.
+// Returns error if connection is invalid.
+func (n *Network) ConnectTerminal(terminalID ID, busID ID) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	terminal, ok := n.terminals[terminalID]
+	if !ok {
+		return fmt.Errorf("terminal %s not found", terminalID)
+	}
+
+	bus, ok := n.buses[busID]
+	if !ok {
+		return fmt.Errorf("bus %s not found", busID)
+	}
+
+	// Check if terminal is already connected
+	if terminal.bus != nil {
+		return fmt.Errorf("terminal %s is already connected to bus %s", terminalID, terminal.bus.ID)
+	}
+
+	// Validate connection
+	if !terminal.CanConnectTo(bus) {
+		return fmt.Errorf("terminal %s (%.0fV, %s) cannot connect to bus %s (%.0fV)",
+			terminalID, terminal.Voltage, terminal.Role, busID, bus.NominalVoltage)
+	}
+
+	// Make connection
+	terminal.bus = bus
+	bus.AddTerminal(terminal)
+
+	return nil
+}
+
+// DisconnectTerminal disconnects a terminal from its bus.
+func (n *Network) DisconnectTerminal(terminalID ID) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	terminal, ok := n.terminals[terminalID]
+	if !ok {
+		return fmt.Errorf("terminal %s not found", terminalID)
+	}
+
+	if terminal.bus == nil {
+		return fmt.Errorf("terminal %s is not connected", terminalID)
+	}
+
+	// Remove from bus
+	terminal.bus.RemoveTerminal(terminalID)
+	terminal.bus = nil
+
+	return nil
+}
+
+// ConnectTerminalToBus connects a terminal directly to a bus (unsafe, no validation).
+func (n *Network) ConnectTerminalToBus(terminal *Terminal, bus *Bus) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	terminal.bus = bus
+	bus.AddTerminal(terminal)
+}
+
+// SourceTerminals returns all source terminals (generators).
+func (n *Network) SourceTerminals() []*Terminal {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	result := make([]*Terminal, 0)
+	for _, t := range n.terminals {
+		if t.Role == TerminalRoleSource {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
+// DestinationTerminals returns all destination terminals (loads).
+func (n *Network) DestinationTerminals() []*Terminal {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	result := make([]*Terminal, 0)
+	for _, t := range n.terminals {
+		if t.Role == TerminalRoleDestination {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
+// ObservationTerminals returns all observation terminals (meters).
+func (n *Network) ObservationTerminals() []*Terminal {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	result := make([]*Terminal, 0)
+	for _, t := range n.terminals {
+		if t.Role == TerminalRoleObservation {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
+// ThroughTerminals returns all through terminals (transformers).
+func (n *Network) ThroughTerminals() []*Terminal {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	result := make([]*Terminal, 0)
+	for _, t := range n.terminals {
+		if t.Role == TerminalRoleThrough {
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
+// TerminalsByBus returns all terminals connected to a bus.
+func (n *Network) TerminalsByBus(busID ID) []*Terminal {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	bus, ok := n.buses[busID]
+	if !ok {
+		return nil
+	}
+
+	return bus.Terminals()
+}
+
+// TerminalsByEntity returns all terminals belonging to an entity.
+func (n *Network) TerminalsByEntity(entityID world.EntityID) []*Terminal {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	result := make([]*Terminal, 0)
+	for _, t := range n.terminals {
+		if t.EntityID == entityID {
+			result = append(result, t)
+		}
+	}
+	return result
 }
 
 // Buses returns all buses.
