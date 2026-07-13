@@ -118,31 +118,18 @@ func (g *GridModel) Tick() {
 	g.activePowerInjection = 0
 	g.reactivePowerInjection = 0
 
-	// Grid voltage regulation (simplified model)
-	// Voltage responds to reactive power imbalance
-	voltageDelta := -g.reactivePowerInjection * g.reactiveSens * 0.01
-	g.voltage += voltageDelta
-
-	// Keep voltage within bounds
-	g.voltage = clamp(g.voltage, 450.0, 520.0)
-
-	// Frequency regulation (simplified model)
-	// Frequency responds to active power imbalance
-	frequencyDelta := -g.activePowerInjection * 0.001
-	g.frequency += frequencyDelta
-
-	// Keep frequency within bounds
-	g.frequency = clamp(g.frequency, 59.5, 60.5)
+	// Grid voltage is maintained by the infinite bus model
+	// No regulation needed - voltage stays at SetVoltage value
 }
 
 // SetVoltage sets the grid voltage directly (for testing/scenarios).
 func (g *GridModel) SetVoltage(v float32) {
-	g.voltage = clamp(v, 450, 520)
+	g.voltage = v
 }
 
 // SetFrequency sets the grid frequency directly (for testing/scenarios).
 func (g *GridModel) SetFrequency(f float32) {
-	g.frequency = clamp(f, 59.5, 60.5)
+	g.frequency = f
 }
 
 // SunModel represents the sun.
@@ -499,6 +486,11 @@ func (b *BusModel) WithdrawPower(mw float32) {
 	b.powerWithdraw += mw
 }
 
+// PowerWithdraw returns the current power withdrawal in MW.
+func (b *BusModel) PowerWithdraw() float32 {
+	return b.powerWithdraw
+}
+
 // Tick updates bus state based on power balance.
 func (b *BusModel) Tick() {
 	// Calculate power imbalance (positive = generation surplus, negative = deficit)
@@ -712,6 +704,52 @@ func (b *BreakerModel) TripCount() uint32 {
 func (b *BreakerModel) Tick() {
 	// Auto-trip on overcurrent (would need current measurement)
 	// For now, this is just a manual control interface
+}
+
+// PVArrayModel represents a solar PV array with inverter.
+type PVArrayModel struct {
+	ModelBase
+
+	// Rated capacity
+	ratedPower float32 // kW
+
+	// Current output
+	currentPower float32 // kW
+
+	// Connected bus
+	busID ModelID
+}
+
+// NewPVArrayModel creates a new PV array model.
+func NewPVArrayModel(id ModelID, bus ModelID, ratedPower float32) *PVArrayModel {
+	return &PVArrayModel{
+		ModelBase:    NewModelBase(id, "pv_array"),
+		ratedPower:   ratedPower,
+		currentPower: 0,
+		busID:       bus,
+	}
+}
+
+// CurrentPower returns the current power output in kW.
+func (p *PVArrayModel) CurrentPower() float32 {
+	return p.currentPower
+}
+
+// BusID returns the connected bus ID.
+func (p *PVArrayModel) BusID() ModelID {
+	return p.busID
+}
+
+// Tick updates PV output based on irradiance.
+func (p *PVArrayModel) Tick() {
+	// This is handled by the device behavior which reads sun model
+	// Just initialize to rated power for now
+	p.currentPower = p.ratedPower * 0.5
+}
+
+// SetPower sets the current power output (called by device behavior).
+func (p *PVArrayModel) SetPower(power float32) {
+	p.currentPower = power
 }
 
 // Helper function to clamp values

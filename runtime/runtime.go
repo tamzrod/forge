@@ -152,6 +152,13 @@ func (r *Runtime) CreateBreakerModel(id models.ModelID, bus1, bus2 models.ModelI
 	return m
 }
 
+// CreatePVArrayModel creates a new PV array model.
+func (r *Runtime) CreatePVArrayModel(id models.ModelID, bus models.ModelID, ratedPower float32) *models.PVArrayModel {
+	m := models.NewPVArrayModel(id, bus, ratedPower)
+	r.CreateModel(m)
+	return m
+}
+
 // CreateReservoirModel creates a new Reservoir model.
 func (r *Runtime) CreateReservoirModel(id models.ModelID, area float32) *models.ReservoirModel {
 	m := models.NewReservoirModel(id, area)

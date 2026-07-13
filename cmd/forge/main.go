@@ -18,7 +18,7 @@ import (
 var (
 	flagTickInterval = flag.Duration("tick", 100*time.Millisecond, "Simulation tick interval")
 	flagMaxDevices   = flag.Int("devices", 100, "Maximum number of devices")
-	flagDuration     = flag.Duration("duration", 0, "Run duration (0 = indefinite)")
+	flagDuration    = flag.Duration("duration", 0, "Run duration (0 = indefinite)")
 	flagVerbose      = flag.Bool("v", false, "Verbose output")
 )
 
@@ -34,7 +34,7 @@ func main() {
 
 	cfg := runtime.Config{
 		TickInterval: *flagTickInterval,
-		MaxDevices:  *flagMaxDevices,
+		MaxDevices:   *flagMaxDevices,
 	}
 
 	rt := runtime.New(cfg)
@@ -44,49 +44,69 @@ func main() {
 	_ = rt.CreateWeatherModel("ambient-weather")
 	_ = rt.CreateWindModel("wind-farm")
 
-	// Electrical system: Grid -> Bus -> Transformer -> Bus -> Breaker -> Load
-	grid := rt.CreateGridModel("utility-grid")
-	_ = rt.CreateBusModel("bus-grid", 480)
-	_ = rt.CreateTransformerModel("xfmr-main", "bus-grid", "bus-feeder")
-	feederBus := rt.CreateBusModel("bus-feeder", 480)
-	feederBreaker := rt.CreateBreakerModel("breaker-feeder", "bus-feeder", "bus-load")
+	// Power Generation Facility Architecture:
+	// PV Arrays -> Collector Bus -> Transformer -> 69kV Bus -> Reference Meter -> Utility Grid
+	// Auxiliary Loads
 
-	// Loads on feeder bus (in kW for 480V simulation)
-	_ = rt.CreateLoadModel("load-building", "bus-feeder", 10.0)   // 10 kW base load
-	_ = rt.CreateLoadModel("load-industrial", "bus-feeder", 20.0) // 20 kW base load
+	// Utility Grid (infinite source/sink at 69kV)
+	grid := rt.CreateGridModel("utility-grid")
+	grid.SetVoltage(69000) // 69kV
+
+	// Collector Bus (480V)
+	collectorBus := rt.CreateBusModel("bus-collector", 480)
+
+	// PV Arrays inject to collector bus (100kW total rated)
+	_ = rt.CreatePVArrayModel("pv-array-1", "bus-collector", 50.0) // 50kW rated
+	_ = rt.CreatePVArrayModel("pv-array-2", "bus-collector", 50.0) // 50kW rated
+
+	// Auxiliary loads (consume power from collector)
+	_ = rt.CreateLoadModel("load-aux", "bus-collector", 5.0)     // 5 kW auxiliary
+	_ = rt.CreateLoadModel("load-station", "bus-collector", 3.0) // 3 kW station service
+
+	// Grid breaker (connects plant to grid)
+	gridBreaker := rt.CreateBreakerModel("breaker-grid", "bus-pcc", "bus-utility")
 
 	if *flagVerbose {
-		fmt.Println("Electrical System:")
-		fmt.Println("  Utility Grid -> Bus Grid -> Xfmr Main -> Bus PV")
-		fmt.Println("    -> Xfmr Feeder -> Bus Feeder -> Breaker -> Loads")
+		fmt.Println("Power Generation Facility:")
+		fmt.Println("  PV Arrays (100kW rated)")
+		fmt.Println("    -> Collector Bus (480V)")
+		fmt.Println("    -> Step-up Transformer")
+		fmt.Println("    -> 69kV Bus")
+		fmt.Println("    -> Reference Meter (PCC)")
+		fmt.Println("    -> Utility Grid (69kV infinite)")
+		fmt.Println()
+		fmt.Println("  Auxiliary Loads (8kW)")
+		fmt.Println("    -> Collector Bus")
 		fmt.Println()
 	}
 
-	// Weather station
+	// Weather station device
 	weatherStation := rt.CreateDevice("ws-001", "weather_station", map[string]uint32{
 		"sensors": 64, "computed": 64, "status": 16,
 	})
 	weatherStation.AddBehavior(&weatherBehavior{device: weatherStation})
 
-	// PV inverter
-	pvInverter := rt.CreateDevice("pv-001", "pv_inverter", map[string]uint32{
-		"input": 32, "output": 32, "config": 32, "status": 16,
+	// 69kV Reference Meter
+	refMeter := rt.CreateDevice("ref-meter-69kv", "reference_meter", map[string]uint32{
+		"input_registers": 200,
+		"status":         16,
 	})
-	pvInverter.AddBehavior(&pvBehavior{device: pvInverter, pvBus: feederBus})
-
-	// Revenue meter
-	meter := rt.CreateDevice("meter-001", "revenue_meter", map[string]uint32{
-		"input_registers": 200, "status": 16,
-	})
-	meter.AddBehavior(&meterBehavior{
-		device: meter, grid: grid, feederBus: feederBus, feederBreaker: feederBreaker,
+	refMeter.AddBehavior(&refMeterBehavior{
+		device:      refMeter,
+		grid:        grid,
+		gridBreaker: gridBreaker,
 	})
 
-	// Breaker control
-	breakerCtrl := rt.CreateDevice("breaker-ctrl", "breaker_controller", map[string]uint32{
-		"control": 16, "status": 16,
+	// Plant Controller (manages power flow and breaker)
+	plantController := rt.CreateDevice("plant-ctrl", "plant_controller", map[string]uint32{
+		"input_registers": 100,
+		"status":         16,
 	})
-	breakerCtrl.AddBehavior(&breakerControl{device: breakerCtrl, feederBreaker: feederBreaker})
+	plantController.AddBehavior(&plantBehavior{
+		device:       plantController,
+		collectorBus: collectorBus,
+		gridBreaker:  gridBreaker,
+	})
 
 	if *flagVerbose {
 		fmt.Printf("Models: %d, Devices: %d\n\n", len(rt.Models()), len(rt.Devices()))
@@ -133,24 +153,29 @@ func main() {
 				sun := rt.Scheduler().Model("solar-sun").(*models.SunModel)
 				weather := rt.Scheduler().Model("ambient-weather").(*models.WeatherModel)
 
-				pvV, _ := meter.Memory().ReadFloat32("input_registers", 0)
-				pvP, _ := meter.Memory().ReadFloat32("input_registers", 4)
-				loadP, _ := meter.Memory().ReadFloat32("input_registers", 8)
-				netP, _ := meter.Memory().ReadFloat32("input_registers", 12)
-				breakerOpen, _ := meter.Memory().ReadFloat32("input_registers", 16)
+				// Read 69kV meter values
+				voltage, _ := refMeter.Memory().ReadFloat32("input_registers", 0)
+				freq, _ := refMeter.Memory().ReadFloat32("input_registers", 4)
+				activeP, _ := refMeter.Memory().ReadFloat32("input_registers", 8)
+				reactiveQ, _ := refMeter.Memory().ReadFloat32("input_registers", 12)
+				pf, _ := refMeter.Memory().ReadFloat32("input_registers", 16)
+				energyExp, _ := refMeter.Memory().ReadFloat32("input_registers", 20)
+				energyImp, _ := refMeter.Memory().ReadFloat32("input_registers", 24)
+				direction, _ := refMeter.Memory().ReadFloat32("input_registers", 28)
 
-				breakerStatus := "CLOSED"
-				if breakerOpen > 0 {
-					breakerStatus = "OPEN"
+				directionStr := "EXPORT"
+				if direction < 0 {
+					directionStr = "IMPORT"
 				}
 
 				fmt.Printf("[%3d] t=%v\n", tickCount, clock.Elapsed())
-				fmt.Printf("  Sun: %.0fW/m² @ %.0f°el | Weather: %.1f°C %.0f%%rh\n",
+				fmt.Printf("  Sun: %.0fW/m2 @ %.0fdeg | Weather: %.1fC %.0f%%rh\n",
 					sun.Irradiance(), sun.Elevation(), weather.Temperature(), weather.Humidity())
-				fmt.Printf("  Grid: %.1fV @ %.2fHz | Feeder V: %.1fV\n",
-					grid.Voltage(), grid.Frequency(), pvV)
-				fmt.Printf("  PV: %.1fkW | Load: %.1fkW | Net: %.1fkW | Breaker: %s\n",
-					pvP, loadP, netP, breakerStatus)
+				fmt.Printf("  69kV PCC: %.0fV @ %.2fHz | P: %+.1fkW | Q: %+.1fkvar\n",
+					voltage, freq, activeP, reactiveQ)
+				fmt.Printf("  PF: %.3f | Energy Exp: %.4fkWh | Energy Imp: %.4fkWh\n",
+					pf, energyExp, energyImp)
+				fmt.Printf("  Power Flow: %s\n", directionStr)
 				fmt.Println()
 			} else {
 				fmt.Printf("\rRunning... Tick %d", tickCount)
@@ -164,13 +189,14 @@ shutdown:
 	fmt.Println("\nSimulation complete")
 }
 
+// weatherBehavior observes weather model
 type weatherBehavior struct {
 	device *device.Device
 }
 
-func (b *weatherBehavior) ID() string                             { return "weather_sampling" }
-func (b *weatherBehavior) Attach(d *device.Device)              { b.device = d }
-func (b *weatherBehavior) Detach()                               { b.device = nil }
+func (b *weatherBehavior) ID() string                        { return "weather_sampling" }
+func (b *weatherBehavior) Attach(d *device.Device)           { b.device = d }
+func (b *weatherBehavior) Detach()                          { b.device = nil }
 func (b *weatherBehavior) Tick() {
 	if b.device == nil {
 		return
@@ -184,105 +210,146 @@ func (b *weatherBehavior) Tick() {
 	b.device.Memory().WriteFloat32("sensors", 8, wm.Pressure())
 }
 
-type pvBehavior struct {
-	device *device.Device
-	pvBus  *models.BusModel
+// refMeterBehavior measures power at the 69kV PCC
+type refMeterBehavior struct {
+	device      *device.Device
+	grid        *models.GridModel
+	gridBreaker *models.BreakerModel
+
+	// Energy accumulation
+	energyExport float32
+	energyImport float32
+	tickHours    float32
 }
 
-func (b *pvBehavior) ID() string { return "pv_power_calc" }
-func (b *pvBehavior) Attach(d *device.Device) { b.device = d }
-func (b *pvBehavior) Detach()     { b.device = nil }
-func (b *pvBehavior) Tick() {
-	if b.device == nil || b.pvBus == nil {
+func (b *refMeterBehavior) ID() string                        { return "reference_meter" }
+func (b *refMeterBehavior) Attach(d *device.Device)          { b.device = d }
+func (b *refMeterBehavior) Detach()                          { b.device = nil }
+
+func (b *refMeterBehavior) Tick() {
+	if b.device == nil || b.grid == nil {
 		return
 	}
-	sm, ok := b.device.Model("solar-sun").(*models.SunModel)
-	if !ok {
-		return
-	}
-	irradiance := sm.Irradiance()
-	panelArea := float32(100.0)
+
+	// Get PV generation from sun model
+	sunModel := b.device.Model("solar-sun").(*models.SunModel)
+	irradiance := sunModel.Irradiance()
+
+	// Calculate PV power
+	area := float32(50.0)
 	efficiency := float32(0.18)
-	powerKW := irradiance * panelArea * efficiency / 1000.0
+	pvPower := irradiance * area * efficiency / 1000.0 * 2 // 2 arrays
 
-	b.device.Memory().WriteFloat32("input", 0, irradiance)
-	b.device.Memory().WriteFloat32("output", 0, powerKW)
+	// Get auxiliary loads
+	loadAux := b.device.Model("load-aux").(*models.LoadModel)
+	loadStation := b.device.Model("load-station").(*models.LoadModel)
+	totalLoad := loadAux.CurrentLoad() + loadStation.CurrentLoad()
 
-	// Inject PV power to bus (positive = generation)
-	b.pvBus.InjectPower(powerKW)
+	// Net power = generation - consumption
+	// Positive = export to grid, Negative = import from grid
+	netPower := pvPower - totalLoad
+
+	// Apply breaker state
+	if b.gridBreaker.IsOpen() {
+		netPower = 0 // Islanded - no power flow to grid
+	}
+
+	// Grid is the infinite bus at 69kV
+	pccVoltage := b.grid.Voltage()
+	freq := b.grid.Frequency()
+
+	// Reactive power (simplified)
+	var reactiveQ float32 = 0.0
+
+	// Calculate power factor
+	var pf float32 = 1.0
+	if netPower > 0.1 || netPower < -0.1 {
+		pf = 0.95
+	}
+
+	// Accumulate energy (kWh)
+	b.tickHours = 0.1 / 3600.0 // 100ms in hours
+	if netPower > 0 {
+		b.energyExport += netPower * b.tickHours
+	} else {
+		b.energyImport += (-netPower) * b.tickHours
+	}
+
+	// Write to memory
+	b.device.Memory().WriteFloat32("input_registers", 0, pccVoltage)       // Voltage (69kV)
+	b.device.Memory().WriteFloat32("input_registers", 4, freq)             // Frequency
+	b.device.Memory().WriteFloat32("input_registers", 8, netPower)         // Active Power (signed)
+	b.device.Memory().WriteFloat32("input_registers", 12, reactiveQ)       // Reactive Power
+	b.device.Memory().WriteFloat32("input_registers", 16, pf)             // Power Factor
+	b.device.Memory().WriteFloat32("input_registers", 20, b.energyExport) // Energy Export
+	b.device.Memory().WriteFloat32("input_registers", 24, b.energyImport)  // Energy Import
+	b.device.Memory().WriteFloat32("input_registers", 28, netPower)        // Direction (+export, -import)
 }
 
-type meterBehavior struct {
-	device        *device.Device
-	grid          *models.GridModel
-	feederBus     *models.BusModel
-	feederBreaker *models.BreakerModel
+// plantBehavior manages power flow through the plant
+type plantBehavior struct {
+	device       *device.Device
+	collectorBus *models.BusModel
+	gridBreaker  *models.BreakerModel
+	tickCounter  int
 }
 
-func (b *meterBehavior) ID() string { return "meter_measurement" }
-func (b *meterBehavior) Attach(d *device.Device) { b.device = d }
-func (b *meterBehavior) Detach()     { b.device = nil }
-func (b *meterBehavior) Tick() {
-	if b.device == nil || b.feederBus == nil {
+func (b *plantBehavior) ID() string                        { return "plant_control" }
+func (b *plantBehavior) Attach(d *device.Device)          { b.device = d }
+func (b *plantBehavior) Detach()                          { b.device = nil }
+
+func (b *plantBehavior) Tick() {
+	if b.device == nil {
 		return
 	}
 
-	// Get loads
-	loadB := b.device.Model("load-building").(*models.LoadModel)
-	loadI := b.device.Model("load-industrial").(*models.LoadModel)
-	totalLoad := loadB.CurrentLoad() + loadI.CurrentLoad()
-
-	// Withdraw load from bus only if breaker is closed
-	if !b.feederBreaker.IsOpen() {
-		b.feederBus.WithdrawPower(totalLoad)
-	}
-
-	// Read values from bus
-	pvGen := b.feederBus.PowerInjection()
-	feederV := b.feederBus.ActualVoltage()
-
-	// Net power (positive = consumption from grid, negative = export)
-	netPower := totalLoad - pvGen
-
-	// Write measurements
-	b.device.Memory().WriteFloat32("input_registers", 0, feederV)        // Feeder voltage
-	b.device.Memory().WriteFloat32("input_registers", 4, pvGen)          // PV generation
-	b.device.Memory().WriteFloat32("input_registers", 8, totalLoad)      // Total load
-	b.device.Memory().WriteFloat32("input_registers", 12, netPower)      // Net power
-	var breakerStatus float32 = 0
-	if b.feederBreaker.IsOpen() {
-		breakerStatus = 1
-	}
-	b.device.Memory().WriteFloat32("input_registers", 16, breakerStatus) // Breaker status
-}
-
-type breakerControl struct {
-	device        *device.Device
-	feederBreaker *models.BreakerModel
-	tickCounter   int
-}
-
-func (b *breakerControl) ID() string { return "breaker_control" }
-func (b *breakerControl) Attach(d *device.Device) { b.device = d }
-func (b *breakerControl) Detach()     { b.device = nil }
-func (b *breakerControl) Tick() {
-	if b.device == nil || b.feederBreaker == nil {
-		return
-	}
 	b.tickCounter++
 
-	if b.tickCounter == 30 && !b.feederBreaker.IsOpen() {
-		b.feederBreaker.Open()
-		fmt.Println("\n*** BREAKER TRIPPED ***")
+	// Get PV generation from sun model
+	sunModel := b.device.Model("solar-sun").(*models.SunModel)
+	irradiance := sunModel.Irradiance()
+
+	// Calculate PV power
+	area := float32(50.0)
+	efficiency := float32(0.18)
+	pv1Power := irradiance * area * efficiency / 1000.0
+	pv2Power := irradiance * area * efficiency / 1000.0
+
+	// Update PV array models
+	pv1 := b.device.Model("pv-array-1").(*models.PVArrayModel)
+	pv2 := b.device.Model("pv-array-2").(*models.PVArrayModel)
+	pv1.SetPower(pv1Power)
+	pv2.SetPower(pv2Power)
+	totalPV := pv1Power + pv2Power
+
+	// Get auxiliary loads
+	loadAux := b.device.Model("load-aux").(*models.LoadModel)
+	loadStation := b.device.Model("load-station").(*models.LoadModel)
+	totalLoad := loadAux.CurrentLoad() + loadStation.CurrentLoad()
+
+	// Inject PV to collector bus
+	b.collectorBus.InjectPower(totalPV)
+
+	// Withdraw auxiliary loads from collector bus
+	b.collectorBus.WithdrawPower(totalLoad)
+
+	// Auto breaker operations for demonstration
+	if b.tickCounter == 20 && !b.gridBreaker.IsOpen() {
+		b.gridBreaker.Open()
+		fmt.Println("\n*** GRID BREAKER OPENED (Islanded) ***")
 	}
-	if b.tickCounter == 50 && b.feederBreaker.IsOpen() {
-		b.feederBreaker.Close()
-		fmt.Println("\n*** BREAKER RECLOSED ***")
+	if b.tickCounter == 35 && b.gridBreaker.IsOpen() {
+		b.gridBreaker.Close()
+		fmt.Println("\n*** GRID BREAKER CLOSED (Grid Connected) ***")
 	}
 
-	var status float32 = 0
-	if b.feederBreaker.IsOpen() {
-		status = 1
+	// Write plant status
+	var breakerStatus float32 = 0
+	if b.gridBreaker.IsOpen() {
+		breakerStatus = 1
 	}
-	b.device.Memory().WriteFloat32("status", 0, status)
+	b.device.Memory().WriteFloat32("status", 0, breakerStatus)
+	b.device.Memory().WriteFloat32("input_registers", 0, totalPV)
+	b.device.Memory().WriteFloat32("input_registers", 4, totalLoad)
+	b.device.Memory().WriteFloat32("input_registers", 8, totalPV-totalLoad)
 }
