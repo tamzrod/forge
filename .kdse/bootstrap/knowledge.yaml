@@ -1,0 +1,173 @@
+#===============================================================================
+# KDSE Knowledge Manifest
+#===============================================================================
+# Defines required and optional knowledge for Runtime Initialization.
+# AI agents shall NOT guess which documents to load.
+#===============================================================================
+
+version: "1.0"
+manifest_version: "2.1"
+generated: "2026-07-11"
+
+#-------------------------------------------------------------------------------
+# Runtime Metadata
+#-------------------------------------------------------------------------------
+runtime:
+  version: "1.0.0"
+  minimum_version: "1.0.0"
+  compatible_standard: ">= 1.0.0"
+  knowledge_version: "1.0.0"
+
+#-------------------------------------------------------------------------------
+# Required Knowledge
+#-------------------------------------------------------------------------------
+# These documents MUST be loaded before any engineering activity begins.
+# Loading order is explicitly defined - do not modify.
+#-------------------------------------------------------------------------------
+required_knowledge:
+
+  - id: core-principles
+    name: Core Principles
+    version: "1.0"
+    source: docs/foundation/003-core-principles.md
+    loading_order: 1
+    description: |
+      The 10 fundamental principles of Knowledge-Driven Software Engineering.
+    capabilities:
+      - principles
+    checksum_required: true
+
+  - id: engineering-model
+    name: Engineering Model
+    version: "1.0"
+    source: docs/foundation/004-engineering-model.md
+    loading_order: 2
+    description: |
+      The five-stage engineering lifecycle.
+    capabilities:
+      - lifecycle
+    checksum_required: true
+
+  - id: chain-of-authority
+    name: Chain of Authority
+    version: "1.0"
+    source: docs/foundation/006-chain-of-authority.md
+    loading_order: 3
+    description: |
+      Authority hierarchy and flow rules.
+    capabilities:
+      - authority
+      - governance
+    checksum_required: true
+
+  - id: glossary
+    name: Glossary
+    version: "1.2"
+    source: docs/foundation/007-glossary.md
+    loading_order: 4
+    description: |
+      Canonical KDSE terminology.
+    capabilities:
+      - terminology
+    checksum_required: true
+
+  - id: session-protocol
+    name: Session Protocol
+    version: "1.0"
+    source: runtime/SESSION_PROTOCOL.md
+    loading_order: 5
+    description: |
+      Session lifecycle definition.
+    capabilities:
+      - session_management
+    checksum_required: true
+
+  - id: command-registry
+    name: Command Registry
+    version: "1.0"
+    source: runtime/install/commands.yaml
+    loading_order: 6
+    description: |
+      Engineering command interface.
+    capabilities:
+      - command_interface
+    checksum_required: true
+
+  - id: runtime-configuration
+    name: Runtime Configuration
+    version: "1.0"
+    source: runtime/VERSIONING.md
+    loading_order: 7
+    description: |
+      Runtime versioning strategy.
+    capabilities:
+      - versioning
+    checksum_required: true
+
+#-------------------------------------------------------------------------------
+# Optional Knowledge
+#-------------------------------------------------------------------------------
+# These documents SHOULD be loaded for complete context.
+#-------------------------------------------------------------------------------
+optional_knowledge:
+
+  - id: engineering-knowledge
+    name: Engineering Knowledge Definition
+    version: "1.0"
+    source: docs/foundation/009-engineering-knowledge.md
+    loading_order: 8
+    description: |
+      What constitutes engineering knowledge.
+    checksum_required: false
+
+  - id: traceability
+    name: Traceability Framework
+    version: "1.0"
+    source: docs/foundation/012-traceability.md
+    loading_order: 9
+    description: |
+      Traceability between artifacts.
+    checksum_required: false
+
+  - id: engineering-artifacts
+    name: Engineering Artifacts
+    version: "1.0"
+    source: docs/foundation/005-engineering-artifacts.md
+    loading_order: 10
+    description: |
+      Artifact type definitions.
+    checksum_required: false
+
+  - id: audit-standards
+    name: Audit Standards
+    version: "1.0"
+    source: docs/audit/COMPLIANCE_AUDIT.md
+    loading_order: 11
+    description: |
+      Compliance audit criteria.
+    checksum_required: false
+
+  - id: debug-runtime
+    name: Debug Runtime
+    version: "1.0"
+    source: runtime/DEBUG_RUNTIME.md
+    loading_order: 12
+    description: |
+      Evidence-driven debugging workflow and architecture.
+    capabilities:
+      - debugging
+      - root-cause-analysis
+      - evidence-collection
+    checksum_required: false
+
+  - id: debug-adr
+    name: Debug Runtime ADR
+    version: "1.0"
+    source: .kdse/architecture/ADR-007-DEBUG_RUNTIME.md
+    loading_order: 13
+    description: |
+      Architecture decision record for Debug Runtime.
+    capabilities:
+      - debugging
+      - architecture
+    checksum_required: false

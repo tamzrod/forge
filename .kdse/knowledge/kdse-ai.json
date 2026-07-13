@@ -1,0 +1,263 @@
+{
+  "$schema": "https://kdse.dev/schemas/kdse-ai/v1.0",
+  "version": "1.0",
+  "generated": "2026-07-11T00:00:00Z",
+  "runtime": {
+    "version": "1.0",
+    "name": "KDSE Runtime",
+    "description": "Knowledge-Driven Software Engineering Runtime",
+    "compatible_standard": ">= 1.0.0",
+    "knowledge_version": "1.0.0"
+  },
+  "knowledge": {
+    "version": "1.0",
+    "fingerprint": "b84085605a4477f828307742df93b702c209aae777c41c35d927e90a09895445",
+    "loaded": [
+      "core-principles",
+      "engineering-model",
+      "chain-of-authority",
+      "glossary",
+      "session-protocol",
+      "command-registry",
+      "runtime-configuration"
+    ],
+    "optional_loaded": [],
+    "status": "READY"
+  },
+  "capabilities": {
+    "assessment": {
+      "description": "Repository compliance assessment",
+      "entrypoint": "Run KDSE",
+      "phases": ["Initialize", "Verify", "Assess", "Report", "Approve"],
+      "dependencies": []
+    },
+    "architecture": {
+      "description": "Architecture design and review",
+      "entrypoint": "Engineering Phase",
+      "phases": ["Knowledge", "Architecture"],
+      "dependencies": ["assessment"]
+    },
+    "implementation": {
+      "description": "Implementation guidance",
+      "entrypoint": "Engineering Phase",
+      "phases": ["Architecture", "Implementation"],
+      "dependencies": ["architecture"]
+    },
+    "verification": {
+      "description": "Implementation verification",
+      "entrypoint": "Verification Phase",
+      "phases": ["Implementation", "Verification"],
+      "dependencies": ["implementation"]
+    },
+    "evolution": {
+      "description": "Methodology evolution",
+      "entrypoint": "Evolution Phase",
+      "phases": ["Evolution"],
+      "dependencies": ["verification"]
+    },
+    "feedback": {
+      "description": "Feedback collection",
+      "entrypoint": "Session Protocol",
+      "phases": ["All"],
+      "dependencies": []
+    },
+    "debugging": {
+      "description": "Evidence-driven debugging workflow",
+      "entrypoint": "kdse debug init",
+      "phases": ["Evidence Collection", "Hypothesis Generation", "Evidence Evaluation", "Confidence Assessment", "Root Cause Selection", "Implementation", "Verification", "Regression Tests"],
+      "dependencies": []
+    },
+    "evidence_collection": {
+      "description": "Structured evidence collection",
+      "entrypoint": "kdse debug collect",
+      "phases": ["Capture", "Classify", "Store"],
+      "dependencies": ["debugging"]
+    },
+    "root_cause_analysis": {
+      "description": "Confidence-driven root cause analysis",
+      "entrypoint": "kdse debug select",
+      "phases": ["Hypothesis", "Evidence Evaluation", "Confidence Scoring", "Selection"],
+      "dependencies": ["debugging", "evidence_collection"]
+    }
+  },
+  "commands": {
+    "session_management": [
+      "Run KDSE",
+      "Continue KDSE",
+      "Close KDSE"
+    ],
+    "session_control": [
+      "Pause KDSE",
+      "Resume KDSE"
+    ],
+    "information": [
+      "KDSE Status",
+      "KDSE Report",
+      "KDSE Progress",
+      "KDSE Scores",
+      "KDSE Findings",
+      "KDSE History"
+    ],
+    "decisions": [
+      "Approve",
+      "Reject",
+      "Defer"
+    ],
+    "administration": [
+      "kdse install",
+      "kdse update",
+      "kdse verify",
+      "kdse uninstall"
+    ],
+    "debugging": [
+      "kdse debug init",
+      "kdse debug collect",
+      "kdse debug hypothesis",
+      "kdse debug evaluate",
+      "kdse debug confidence",
+      "kdse debug select",
+      "kdse debug report",
+      "kdse debug next",
+      "kdse debug state",
+      "kdse debug evidence",
+      "kdse debug hypotheses"
+    ]
+  },
+  "principles": {
+    "core": [
+      {
+        "id": 1,
+        "statement": "Knowledge precedes architecture"
+      },
+      {
+        "id": 2,
+        "statement": "Architecture precedes implementation"
+      },
+      {
+        "id": 3,
+        "statement": "Implementation precedes verification"
+      },
+      {
+        "id": 4,
+        "statement": "Knowledge is the longest-lived artifact"
+      },
+      {
+        "id": 5,
+        "statement": "Engineering decisions must be traceable"
+      },
+      {
+        "id": 6,
+        "statement": "Code realizes knowledge"
+      },
+      {
+        "id": 7,
+        "statement": "Knowledge is language-independent"
+      },
+      {
+        "id": 8,
+        "statement": "Authority flows downward"
+      },
+      {
+        "id": 9,
+        "statement": "Verification confirms alignment"
+      },
+      {
+        "id": 10,
+        "statement": "Evolution maintains authority"
+      }
+    ]
+  },
+  "lifecycle": {
+    "stages": [
+      "Knowledge",
+      "Architecture",
+      "Implementation",
+      "Verification",
+      "Evolution"
+    ],
+    "flow": "Knowledge → Architecture → Implementation → Verification → Evolution",
+    "current": "READY"
+  },
+  "authority": {
+    "hierarchy": [
+      "Knowledge",
+      "Architecture",
+      "Implementation",
+      "Verification"
+    ],
+    "rule": "Lower layers cannot contradict higher layers",
+    "fundament_rule": "No lower layer may contradict a higher layer"
+  },
+  "sources": {
+    "required": [
+      {
+        "id": "core-principles",
+        "path": "docs/foundation/003-core-principles.md",
+        "loading_order": 1
+      },
+      {
+        "id": "engineering-model",
+        "path": "docs/foundation/004-engineering-model.md",
+        "loading_order": 2
+      },
+      {
+        "id": "chain-of-authority",
+        "path": "docs/foundation/006-chain-of-authority.md",
+        "loading_order": 3
+      },
+      {
+        "id": "glossary",
+        "path": "docs/foundation/007-glossary.md",
+        "loading_order": 4
+      },
+      {
+        "id": "session-protocol",
+        "path": "runtime/SESSION_PROTOCOL.md",
+        "loading_order": 5
+      },
+      {
+        "id": "command-registry",
+        "path": "runtime/install/commands.yaml",
+        "loading_order": 6
+      },
+      {
+        "id": "runtime-configuration",
+        "path": "runtime/VERSIONING.md",
+        "loading_order": 7
+      }
+    ],
+    "optional": [
+      {
+        "id": "engineering-knowledge",
+        "path": "docs/foundation/009-engineering-knowledge.md",
+        "loading_order": 8
+      },
+      {
+        "id": "traceability",
+        "path": "docs/foundation/012-traceability.md",
+        "loading_order": 9
+      },
+      {
+        "id": "engineering-artifacts",
+        "path": "docs/foundation/005-engineering-artifacts.md",
+        "loading_order": 10
+      },
+      {
+        "id": "audit-standards",
+        "path": "docs/audit/COMPLIANCE_AUDIT.md",
+        "loading_order": 11
+      },
+      {
+        "id": "debug-runtime",
+        "path": "runtime/DEBUG_RUNTIME.md",
+        "loading_order": 12
+      },
+      {
+        "id": "debug-adr",
+        "path": ".kdse/architecture/ADR-007-DEBUG_RUNTIME.md",
+        "loading_order": 13
+      }
+    ]
+  },
+  "status": "READY"
+}

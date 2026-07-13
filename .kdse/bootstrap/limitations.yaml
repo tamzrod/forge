@@ -1,0 +1,97 @@
+#===============================================================================
+# KDSE Runtime Limitations
+#===============================================================================
+# Defines known limitations of the Runtime.
+# AI agents should be aware of these limitations.
+#===============================================================================
+
+version: "1.0"
+generated: "2026-07-11"
+
+#-------------------------------------------------------------------------------
+# Limitations
+#-------------------------------------------------------------------------------
+limitations:
+
+  - id: no_implementation
+    title: No Code Implementation
+    description: |
+      The Runtime does not implement code changes directly.
+      All implementation requires human action or external tools.
+    severity: info
+    category: implementation
+    workaround: "AI provides guidance; humans execute changes"
+
+  - id: human_approval_required
+    title: Human Approval Required
+    description: |
+      All implementation recommendations require human approval
+      before proceeding. The Runtime cannot autonomously make changes.
+    severity: info
+    category: governance
+    workaround: "Present recommendations to human for approval"
+
+  - id: no_real_time_audit
+    title: No Real-Time Audit
+    description: |
+      Audits require explicit invocation via 'kdse run' or 'kdse audit'.
+      The Runtime does not continuously monitor the repository.
+    severity: warning
+    category: monitoring
+    workaround: "Run 'kdse run' periodically to assess repository"
+
+  - id: session_state_persistence
+    title: Session State Persistence
+    description: |
+      Session state is not persisted between shell sessions.
+      Each new shell session requires re-initialization.
+    severity: warning
+    category: persistence
+    workaround: "Run 'kdse run' to reinitialize each session"
+
+  - id: no_code_generation
+    title: No Code Generation
+    description: |
+      The Runtime does not generate code, configurations, or files.
+      It provides guidance and recommendations only.
+    severity: info
+    category: implementation
+    workaround: "Use AI coding tools for actual implementation"
+
+  - id: limited_verification
+    title: Limited Automatic Verification
+    description: |
+      Verification is based on static analysis and audit criteria.
+      Dynamic testing requires external tooling.
+    severity: warning
+    category: verification
+    workaround: "Integrate with CI/CD pipelines for testing"
+
+  - id: knowledge_dependency
+    title: Knowledge Dependency
+    description: |
+      The Runtime requires KDSE knowledge documents to function.
+      Without proper documents, initialization will fail.
+    severity: warning
+    category: dependencies
+    workaround: "Ensure all required knowledge documents are present"
+
+#-------------------------------------------------------------------------------
+# Severity Levels
+#-------------------------------------------------------------------------------
+severity_levels:
+  info: |
+    Informational limitation. Does not prevent operation.
+  warning: |
+    Limitation that may affect operation. User should be aware.
+  error: |
+    Limitation that prevents operation. Requires resolution.
+
+#-------------------------------------------------------------------------------
+# Limitation Count
+#-------------------------------------------------------------------------------
+metadata:
+  total_limitations: 7
+  info_count: 3
+  warning_count: 4
+  error_count: 0

@@ -1,0 +1,128 @@
+#===============================================================================
+# KDSE Capability Registry
+#===============================================================================
+# Defines available capabilities for Runtime Initialization.
+#===============================================================================
+
+version: "1.0"
+generated: "2026-07-11"
+
+#-------------------------------------------------------------------------------
+# Capabilities
+#-------------------------------------------------------------------------------
+capabilities:
+
+  - name: assessment
+    description: Repository compliance assessment
+    entrypoint: "Run KDSE"
+    dependencies: []
+    knowledge_required:
+      - core-principles
+      - engineering-model
+      - chain-of-authority
+    phases:
+      - Initialize
+      - Verify
+      - Assess
+      - Report
+    status: available
+
+  - name: recommendation_engine
+    description: Action recommendation based on findings
+    entrypoint: "Report Phase"
+    dependencies:
+      - assessment
+    knowledge_required:
+      - session-protocol
+    phases:
+      - Report
+    status: available
+
+  - name: architecture
+    description: Architecture design and review
+    entrypoint: "Engineering Phase"
+    dependencies:
+      - assessment
+    knowledge_required:
+      - engineering-model
+      - chain-of-authority
+    phases:
+      - Knowledge
+      - Architecture
+    status: available
+
+  - name: verification
+    description: Implementation verification
+    entrypoint: "Verification Phase"
+    dependencies:
+      - architecture
+    knowledge_required:
+      - chain-of-authority
+    phases:
+      - Implementation
+      - Verification
+    status: available
+
+  - name: evolution
+    description: Methodology evolution
+    entrypoint: "Evolution Phase"
+    dependencies:
+      - verification
+    knowledge_required:
+      - engineering-model
+    phases:
+      - Evolution
+    status: available
+
+  - name: feedback
+    description: Feedback collection
+    entrypoint: "Session Protocol"
+    dependencies: []
+    knowledge_required: []
+    phases:
+      - All
+    status: available
+
+  - name: debugging
+    description: Evidence-driven debugging with confidence-based root cause selection
+    entrypoint: "Debug Runtime"
+    dependencies:
+      - assessment
+    knowledge_required:
+      - debug-runtime
+      - debug-adr
+    phases:
+      - Knowledge
+      - Implementation
+    status: available
+
+  - name: evidence_collection
+    description: Systematic collection of debugging evidence
+    entrypoint: "Evidence Collector"
+    dependencies:
+      - debugging
+    knowledge_required:
+      - debug-runtime
+    phases:
+      - Implementation
+    status: available
+
+  - name: root_cause_analysis
+    description: Confidence-driven root cause identification
+    entrypoint: "Root Cause Selector"
+    dependencies:
+      - debugging
+      - evidence_collection
+    knowledge_required:
+      - debug-runtime
+    phases:
+      - Implementation
+      - Verification
+    status: available
+
+#-------------------------------------------------------------------------------
+# Capability Metadata
+#-------------------------------------------------------------------------------
+metadata:
+  total_capabilities: 6
+  capability_count: 6

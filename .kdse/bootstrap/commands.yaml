@@ -1,0 +1,178 @@
+#===============================================================================
+# KDSE Command Registry
+#===============================================================================
+# Defines available commands for Runtime Initialization.
+#===============================================================================
+
+version: "1.0"
+interface_version: "1.0"
+generated: "2026-07-11"
+
+#-------------------------------------------------------------------------------
+# Session Management Commands
+#-------------------------------------------------------------------------------
+session_management:
+  - name: Run KDSE
+    command: kdse run
+    description: Start a new KDSE session
+    category: session
+    required: true
+    ai_enabled: true
+    aliases:
+      - "run kdse"
+      - "start kdse"
+      - "begin session"
+
+  - name: Continue KDSE
+    command: kdse resume
+    description: Resume an existing session
+    category: session
+    required: true
+    ai_enabled: true
+    aliases:
+      - "continue kdse"
+      - "resume session"
+
+  - name: Close KDSE
+    command: kdse close
+    description: End the current session
+    category: session
+    required: true
+    ai_enabled: true
+    aliases:
+      - "close kdse"
+      - "end session"
+
+#-------------------------------------------------------------------------------
+# Information Commands
+#-------------------------------------------------------------------------------
+information:
+  - name: KDSE Status
+    command: kdse status
+    description: Show runtime health and status
+    category: information
+    required: true
+    ai_enabled: true
+
+  - name: KDSE Report
+    command: kdse report
+    description: List available reports
+    category: information
+    required: true
+    ai_enabled: true
+
+  - name: KDSE Progress
+    command: kdse progress
+    description: Show session progress
+    category: information
+    required: true
+    ai_enabled: true
+
+#-------------------------------------------------------------------------------
+# Decision Commands
+#-------------------------------------------------------------------------------
+decisions:
+  - name: Approve
+    description: Approve the current recommendation
+    category: decision
+    required: true
+    human_only: true
+    ai_enabled: false
+
+  - name: Reject
+    description: Reject the current recommendation
+    category: decision
+    required: true
+    human_only: true
+    ai_enabled: false
+
+  - name: Defer
+    description: Defer the current recommendation
+    category: decision
+    required: true
+    human_only: true
+    ai_enabled: false
+
+#-------------------------------------------------------------------------------
+# Maintenance Commands
+#-------------------------------------------------------------------------------
+maintenance:
+  - name: kdse install
+    description: Install runtime
+    category: administration
+
+  - name: kdse update
+    description: Update runtime
+    category: maintenance
+
+  - name: kdse verify
+    description: Verify installation
+    category: maintenance
+
+  - name: kdse uninstall
+    description: Remove runtime
+    category: administration
+
+#-------------------------------------------------------------------------------
+# Debug Commands
+#-------------------------------------------------------------------------------
+debug:
+  - name: kdse debug
+    description: Start evidence-driven debugging session
+    category: debugging
+    required: false
+    ai_enabled: true
+    workflow: Evidence Collection → Hypothesis Generation → Evidence Evaluation → Confidence Assessment → Root Cause Selection → Implementation → Verification
+
+  - name: kdse verify
+    description: Investigate verification failures
+    category: debugging
+    required: false
+    ai_enabled: true
+    reuses: debug_engine
+
+  - name: kdse repair
+    description: Investigate and fix issues
+    category: debugging
+    required: false
+    ai_enabled: true
+    reuses: debug_engine
+
+  - name: kdse audit
+    description: Investigate audit findings
+    category: debugging
+    required: false
+    ai_enabled: true
+    reuses: debug_engine
+
+#-------------------------------------------------------------------------------
+# Command Resolution Map
+#-------------------------------------------------------------------------------
+resolution_map:
+  start_session:
+    - "run kdse"
+    - "start kdse"
+    - "begin session"
+    - "Run KDSE"
+    command: kdse run
+
+  continue_session:
+    - "continue kdse"
+    - "resume session"
+    - "Continue KDSE"
+    command: kdse resume
+
+  check_status:
+    - "kdse status"
+    - "show status"
+    - "KDSE Status"
+    command: kdse status
+
+#-------------------------------------------------------------------------------
+# Command Metadata
+#-------------------------------------------------------------------------------
+metadata:
+  total_commands: 12
+  required_commands: 7
+  ai_enabled_commands: 6
+  human_only_commands: 3

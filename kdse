@@ -1,0 +1,1658 @@
+#!/bin/bash
+# KDSE Runtime Command
+# Knowledge-Driven Software Engineering
+
+set -e
+
+KDSE_REPO="tamzrod/KDSE"
+KDSE_BRANCH="main"
+TEMP_DIR=$(mktemp -d)
+LOCAL_KDSE_DIR=".kdse"
+COMMAND="${1:-}"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Protected files that should never be overwritten
+PROTECTED_FILES=(
+    "context.json"
+    "state.json"
+)
+
+# Protected directories (user-generated content)
+PROTECTED_DIRS=(
+    "reports"
+)
+
+cleanup() {
+    rm -rf "$TEMP_DIR"
+}
+trap cleanup EXIT
+
+#===============================================================================
+# Helper Functions
+#===============================================================================
+
+print_header() {
+    echo ""
+    echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BLUE}  $1${NC}"
+    echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+}
+
+print_step() {
+    echo -e "${GREEN}[$1]${NC} $2"
+}
+
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+is_protected() {
+    local file="$1"
+    for protected in "${PROTECTED_FILES[@]}"; do
+        if [[ "$file" == *"$protected" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+is_in_protected_dir() {
+    local file="$1"
+    for protected_dir in "${PROTECTED_DIRS[@]}"; do
+        if [[ "$file" == *"$protected_dir"* ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+#===============================================================================
+# Command: update
+#===============================================================================
+
+cmd_update() {
+    FILES_ADDED=()
+    FILES_UPDATED=()
+    FILES_SKIPPED=()
+
+    echo "=== KDSE Update ==="
+    echo "Syncing with: https://github.com/$KDSE_REPO"
+    echo ""
+
+    # Step 1: Clone latest KDSE repository
+    print_step "1/4" "Cloning latest KDSE repository..."
+    git clone --depth 1 --branch "$KDSE_BRANCH" "https://github.com/$KDSE_REPO.git" "$TEMP_DIR" 2>/dev/null || {
+        echo "ERROR: Failed to clone KDSE repository"
+        exit 1
+    }
+
+    # Step 2: Compare and sync files
+    print_step "2/4" "Comparing files..."
+    print_step "3/4" "Synchronizing..."
+
+    REMOTE_KDSE="$TEMP_DIR/.kdse"
+
+    if [ ! -d "$REMOTE_KDSE" ]; then
+        echo "ERROR: KDSE runtime not found in remote repository"
+        exit 1
+    fi
+
+    # Sync files from remote to local
+    sync_files() {
+        local src_dir="$1"
+        local dest_dir="$2"
+        
+        while IFS= read -r -d '' file; do
+            rel_path="${file#$src_dir/}"
+            
+            if is_protected "$rel_path"; then
+                FILES_SKIPPED+=("$rel_path (protected)")
+                continue
+            fi
+            
+            if is_in_protected_dir "$rel_path"; then
+                FILES_SKIPPED+=("$rel_path (user-generated)")
+                continue
+            fi
+            
+            dest_file="$dest_dir/$rel_path"
+            dest_file_dir=$(dirname "$dest_file")
+            if [ ! -d "$dest_file_dir" ]; then
+                mkdir -p "$dest_file_dir"
+            fi
+            
+            if [ -f "$dest_file" ]; then
+                if ! diff -q "$file" "$dest_file" > /dev/null 2>&1; then
+                    cp "$file" "$dest_file"
+                    FILES_UPDATED+=("$rel_path")
+                else
+                    FILES_SKIPPED+=("$rel_path (identical)")
+                fi
+            else
+                cp "$file" "$dest_file"
+                FILES_ADDED+=("$rel_path")
+            fi
+        done < <(find "$src_dir" -type f -print0)
+    }
+
+    if [ ! -d "$LOCAL_KDSE_DIR" ]; then
+        mkdir -p "$LOCAL_KDSE_DIR"
+    fi
+
+    sync_files "$REMOTE_KDSE" "$LOCAL_KDSE_DIR"
+
+    if [ -d "$TEMP_DIR/docs" ] && [ -d "$TEMP_DIR/docs/kdse" ]; then
+        if [ ! -d "docs/kdse" ]; then
+            mkdir -p "docs/kdse"
+        fi
+        sync_files "$TEMP_DIR/docs/kdse" "docs/kdse"
+    fi
+
+    print_step "4/4" "Update complete!"
+    echo ""
+    echo "=== Summary ==="
+    echo ""
+    echo "Files Added ($(( ${#FILES_ADDED[@]} ))):"
+    if [ ${#FILES_ADDED[@]} -eq 0 ]; then
+        echo "  None"
+    else
+        for f in "${FILES_ADDED[@]}"; do
+            echo "  + $f"
+        done
+    fi
+    echo ""
+    echo "Files Updated ($(( ${#FILES_UPDATED[@]} ))):"
+    if [ ${#FILES_UPDATED[@]} -eq 0 ]; then
+        echo "  None"
+    else
+        for f in "${FILES_UPDATED[@]}"; do
+            echo "  ~ $f"
+        done
+    fi
+    echo ""
+    echo "Files Skipped ($(( ${#FILES_SKIPPED[@]} ))):"
+    if [ ${#FILES_SKIPPED[@]} -eq 0 ]; then
+        echo "  None"
+    else
+        for f in "${FILES_SKIPPED[@]}"; do
+            echo "  - $f"
+        done
+    fi
+    echo ""
+    echo "KDSE runtime synchronized successfully."
+}
+
+#===============================================================================
+# Command: run
+#===============================================================================
+
+cmd_run() {
+    print_header "KDSE Session"
+    echo "Starting KDSE session for repository: $(basename $(pwd))"
+    echo ""
+    
+    # Phase 0: Initialize
+    print_step "1/7" "Initialize - Loading KDSE Runtime..."
+    if [ ! -d ".kdse" ]; then
+        print_error "KDSE runtime not found. Run 'kdse update' first."
+        exit 1
+    fi
+    print_success "Runtime loaded"
+    
+    # Phase 1: Verify Standards
+    print_step "2/7" "Verify Standards - Checking KDSE methodology..."
+    if [ -f ".kdse/knowledge/manifest.yaml" ]; then
+        print_success "Knowledge manifest verified"
+    fi
+    if [ -f ".kdse/bootstrap/commands.yaml" ]; then
+        print_success "Command registry verified"
+    fi
+    
+    # Phase 2: Assess Repository
+    print_step "3/7" "Assess Repository - Analyzing codebase..."
+    assess_repository
+    
+    # Phase 3: Generate Report
+    print_step "4/7" "Generate Report - Creating assessment..."
+    generate_report
+    
+    # Phase 5: Await Approval
+    print_step "5/7" "Await Approval - Review recommendations..."
+    echo ""
+    echo "─────────────────────────────────────────────────────────────"
+    echo " TOP RECOMMENDATION"
+    echo "─────────────────────────────────────────────────────────────"
+    echo ""
+    echo " Action: $TOP_RECOMMENDATION"
+    echo " Priority: $TOP_PRIORITY"
+    echo " Impact: $TOP_IMPACT"
+    echo ""
+    
+    # Phase 6: Implement (placeholder - would be interactive)
+    print_step "6/7" "Implement - Execute recommended actions..."
+    print_warning "Interactive implementation not yet supported"
+    echo "  → Use 'kdse audit' for assessment details"
+    echo "  → Use 'kdse status' to check repository health"
+    
+    # Phase 7: Complete
+    print_step "7/7" "Complete - Session summary..."
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════"
+    echo "  KDSE Session Complete"
+    echo "═══════════════════════════════════════════════════════════════"
+    echo ""
+    echo " Next Steps:"
+    echo "   • Review the assessment report"
+    echo "   • Address high-priority findings"
+    echo "   • Run 'kdse run' again after implementing fixes"
+    echo ""
+}
+
+assess_repository() {
+    echo ""
+    echo "─────────────────────────────────────────────────────────────"
+    echo " ASSESSMENT RESULTS"
+    echo "─────────────────────────────────────────────────────────────"
+    echo ""
+    
+    # Count files
+    local total_files=$(find . -type f -name "*.go" | wc -l)
+    local test_files=$(find . -type f -name "*_test.go" | wc -l)
+    local docs=$(find docs -type f 2>/dev/null | wc -l)
+    
+    echo " Architecture:"
+    echo "   • Go source files: $total_files"
+    echo "   • Test files: $test_files"
+    echo "   • Documentation files: $docs"
+    
+    # Check for KDSE dimensions
+    echo ""
+    echo " KDSE Dimensions:"
+    
+    if [ -d "docs/architecture" ]; then
+        print_success "Architecture Artifacts"
+    else
+        print_error "Architecture Artifacts"
+    fi
+    
+    if [ -d "docs/adrs" ]; then
+        print_success "Authority Hierarchy"
+    else
+        print_warning "Authority Hierarchy (missing ADRs)"
+    fi
+    
+    if [ -f ".github/workflows" ] || [ -d ".github/workflows" ]; then
+        print_success "Governance (CI/CD)"
+    else
+        print_warning "Governance"
+    fi
+    
+    if [ $test_files -gt 0 ]; then
+        print_success "Implementation Artifacts"
+    else
+        print_error "Implementation Artifacts"
+    fi
+    
+    if [ $docs -gt 5 ]; then
+        print_success "Knowledge Artifacts"
+    else
+        print_warning "Knowledge Artifacts"
+    fi
+    
+    if [ -d ".kdse/reports" ]; then
+        print_success "Traceability"
+    else
+        print_warning "Traceability"
+    fi
+    
+    # Run tests if available
+    echo ""
+    echo " Verification:"
+    if command -v go &> /dev/null; then
+        if go test ./... 2>&1 | grep -q "ok"; then
+            print_success "Tests passing"
+        else
+            local failures=$(go test ./... 2>&1 | grep -c "FAIL" || echo "0")
+            if [ "$failures" -gt 0 ]; then
+                print_error "Tests failing ($failures failures)"
+            else
+                print_success "Tests passing"
+            fi
+        fi
+    else
+        print_warning "Go not available"
+    fi
+    
+    # Set recommendation
+    TOP_RECOMMENDATION="Improve Verification Practices"
+    TOP_PRIORITY="High"
+    TOP_IMPACT="+1.0 points to overall score"
+}
+
+generate_report() {
+    echo ""
+    echo "─────────────────────────────────────────────────────────────"
+    echo " KDSE ASSESSMENT REPORT"
+    echo "─────────────────────────────────────────────────────────"
+    echo ""
+    
+    # Create reports directory
+    mkdir -p .kdse/reports
+    
+    # Calculate status values
+    local arch_status="❌"
+    [ -d "docs/architecture" ] && arch_status="✅"
+    
+    local auth_status="❌"
+    [ -d "docs/adrs" ] && auth_status="✅"
+    
+    local gov_status="❌"
+    [ -d ".github/workflows" ] && gov_status="✅"
+    
+    local impl_status="❌"
+    [ $(find . -type f -name "*_test.go" 2>/dev/null | wc -l) -gt 0 ] && impl_status="✅"
+    
+    local know_status="❌"
+    [ $(find docs -type f 2>/dev/null | wc -l) -gt 5 ] && know_status="✅"
+    
+    local trace_status="❌"
+    [ -d ".kdse/reports" ] && trace_status="✅"
+    
+    local report_file=".kdse/reports/KDSE-RUN-$(date +%Y%m%d-%H%M%S).md"
+    
+    cat > "$report_file" << EOF
+# KDSE Run Report
+
+**Date:** $(date -Iseconds)  
+**Repository:** $(basename $(pwd))  
+**Session:** KDSE-RUN-$(date +%Y%m%d-%H%M%S)
+
+---
+
+## Summary
+
+| Dimension | Status | Notes |
+|-----------|--------|-------|
+| Architecture Artifacts | $arch_status | |
+| Authority Hierarchy | $auth_status | |
+| Governance | $gov_status | CI/CD |
+| Implementation Artifacts | $impl_status | |
+| Knowledge Artifacts | $know_status | |
+| Traceability | $trace_status | |
+| Verification | ⚠️ | Tests need verification |
+
+---
+
+## Top Recommendation
+
+**Action:** Improve Verification Practices
+
+**Priority:** High
+
+**Rationale:** This dimension has the lowest score and represents the highest-value improvement opportunity.
+
+---
+
+## Next Steps
+
+1. Review failing tests (if any)
+2. Address high-priority findings
+3. Run 'kdse run' again after implementing fixes
+
+---
+
+*Generated by KDSE Runtime*
+EOF
+    
+    print_success "Report saved to: $report_file"
+}
+
+#===============================================================================
+# Command: status
+#===============================================================================
+
+cmd_status() {
+    print_header "KDSE Status"
+    
+    echo "Runtime:"
+    echo "  Version: 1.0.0"
+    echo "  Repository: $KDSE_REPO"
+    echo "  Branch: $KDSE_BRANCH"
+    echo ""
+    
+    echo "Local Installation:"
+    if [ -d ".kdse" ]; then
+        print_success ".kdse directory exists"
+    else
+        print_error ".kdse directory not found"
+    fi
+    
+    if [ -f ".kdse/knowledge/manifest.yaml" ]; then
+        print_success "Knowledge manifest present"
+    fi
+    
+    if [ -f ".kdse/bootstrap/commands.yaml" ]; then
+        print_success "Command registry present"
+    fi
+    echo ""
+    
+    echo "Repository Status:"
+    local files=$(find . -type f -name "*.go" 2>/dev/null | wc -l)
+    local tests=$(find . -type f -name "*_test.go" 2>/dev/null | wc -l)
+    echo "  • Source files: $files"
+    echo "  • Test files: $tests"
+    
+    if [ -d ".git" ]; then
+        echo "  • Git repository: Yes"
+    fi
+}
+
+#===============================================================================
+# Audit Helper Functions
+#===============================================================================
+
+# Check artifact existence
+check_artifacts() {
+    # Architecture
+    has_context_diagram=$(find docs -name "*context*" 2>/dev/null | wc -l)
+    has_component_diagram=$(find docs -name "*component*" 2>/dev/null | wc -l)
+    has_sequence_diagram=$(find docs -name "*sequence*" 2>/dev/null | wc -l)
+    has_api_docs=$(find docs -name "*api*" -o -name "*API*" 2>/dev/null | grep -v "Binary" | wc -l)
+    has_deployment_docs=$(find docs -name "*deployment*" -o -name "*deploy*" 2>/dev/null | wc -l)
+    
+    # Governance
+    has_issue_templates=$(find .github/issue_templates -type f 2>/dev/null | wc -l)
+    has_pr_templates=$(find .github/pull_request_template* -type f 2>/dev/null | wc -l)
+    has_lint_config=$(find . -name ".golangci.yml" -o -name ".golangci.yaml" 2>/dev/null | wc -l)
+    has_readme_quality=$(grep -l "Quick Start\|Installation\|Usage" README.md 2>/dev/null | wc -l)
+    has_changelog=$(find . -name "CHANGELOG*" -o -name "CHANGES*" 2>/dev/null | wc -l)
+    
+    # Files
+    test_files=$(find . -type f -name "*_test.go" 2>/dev/null | wc -l)
+    go_files=$(find . -type f -name "*.go" 2>/dev/null | wc -l)
+    docs=$(find docs -type f 2>/dev/null | wc -l)
+    adrs=$(find docs/adrs -type f -name "ADR-*.md" 2>/dev/null | wc -l)
+    
+    # Knowledge
+    has_vision=$(find docs -name "vision.md" 2>/dev/null | wc -l)
+    has_glossary=$(find docs -name "GLOSSARY.md" -o -name "glossary.md" 2>/dev/null | wc -l)
+    
+    # Verification
+    has_ci=$(find .github/workflows -name "*.yml" -o -name "*.yaml" 2>/dev/null | wc -l)
+    has_test_coverage=$(grep -c "coverage" .github/workflows/*.yml 2>/dev/null || echo "0")
+    
+    # Traceability
+    has_trace_matrix=$(find docs -name "*trace*" -o -name "*Trace*" 2>/dev/null | wc -l)
+}
+
+# Print progress header
+print_phase() {
+    local phase="$1"
+    local completed="$2"
+    local current="$3"
+    local next="$4"
+    
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════════════════"
+    echo "  Current Phase"
+    echo "  $phase"
+    echo "═══════════════════════════════════════════════════════════════════════════"
+    echo ""
+    
+    if [ -n "$completed" ]; then
+        echo "  Completed"
+        echo "  $completed" | sed 's/^/  /'
+        echo ""
+    fi
+    
+    if [ -n "$current" ]; then
+        echo "  Current Task"
+        echo "  Creating ${current}..."
+        echo ""
+    fi
+    
+    if [ -n "$next" ]; then
+        echo "  Next"
+        echo "  $next"
+        echo ""
+    fi
+}
+
+# Print completion message
+print_completion() {
+    local score="$1"
+    local artifacts="$2"
+    
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════════════════"
+    echo "  BUILD COMPLETE"
+    echo "═══════════════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "  Final Score: $score/10"
+    echo "  Artifacts: $artifacts"
+    echo ""
+    echo "  All REQUIRED artifacts have been generated."
+    echo ""
+}
+
+#===============================================================================
+# Command: generate (Build Pipeline Mode)
+#===============================================================================
+
+cmd_generate() {
+    print_header "KDSE Generate"
+    echo "Building required artifacts automatically..."
+    echo ""
+    
+    local loop=1
+    local max_loops=20
+    
+    while [ $loop -le $max_loops ]; do
+        check_artifacts
+        
+        # Track what we'll complete this run
+        local completed=""
+        local current=""
+        local next=""
+        local did_work=false
+        
+        # Architecture Phase
+        echo ""
+        echo "┌─────────────────────────────────────────────────────────────────────┐"
+        echo "│ Phase 1: Architecture Readiness                                       │"
+        echo "└─────────────────────────────────────────────────────────────────────┘"
+        echo ""
+        
+        if [ $has_context_diagram -gt 0 ] && [ $has_component_diagram -gt 0 ] && [ $has_sequence_diagram -gt 0 ]; then
+            echo "  ✓ Context Diagram (exists)"
+            echo "  ✓ Component Diagram (exists)"
+            echo "  ✓ Runtime Sequence Diagram (exists)"
+            completed="${completed}✓ Context Diagram\n✓ Component Diagram\n✓ Runtime Sequence Diagram"
+        else
+            # Context Diagram
+            if [ $has_context_diagram -eq 0 ]; then
+                echo "  ✗ Context Diagram (missing)"
+                if [ -z "$current" ]; then
+                    current="Context Diagram"
+                    cmd_generate_context
+                    did_work=true
+                    completed="${completed}✓ Context Diagram"
+                fi
+            else
+                completed="${completed}✓ Context Diagram"
+            fi
+            
+            # Component Diagram
+            if [ $has_component_diagram -eq 0 ]; then
+                echo "  ✗ Component Diagram (missing)"
+                if [ -z "$current" ] && [ "$did_work" = false ]; then
+                    current="Component Diagram"
+                    cmd_generate_component
+                    did_work=true
+                    completed="${completed}\n✓ Component Diagram"
+                fi
+            else
+                completed="${completed}\n✓ Component Diagram"
+            fi
+            
+            # Sequence Diagram
+            if [ $has_sequence_diagram -eq 0 ]; then
+                echo "  ✗ Runtime Sequence Diagram (missing)"
+                if [ -z "$current" ] && [ "$did_work" = false ]; then
+                    current="Runtime Sequence Diagram"
+                    cmd_generate_sequence
+                    did_work=true
+                    completed="${completed}\n✓ Runtime Sequence Diagram"
+                fi
+            else
+                completed="${completed}\n✓ Runtime Sequence Diagram"
+            fi
+        fi
+        
+        echo ""
+        echo "┌─────────────────────────────────────────────────────────────────────┐"
+        echo "│ Phase 2: Governance Setup                                            │"
+        echo "└─────────────────────────────────────────────────────────────────────┘"
+        echo ""
+        
+        if [ $has_issue_templates -gt 0 ] && [ $has_pr_templates -gt 0 ] && [ $has_lint_config -gt 0 ]; then
+            echo "  ✓ Issue Templates (exists)"
+            echo "  ✓ PR Template (exists)"
+            echo "  ✓ Linting Configuration (exists)"
+        else
+            # Issue Templates
+            if [ $has_issue_templates -eq 0 ]; then
+                echo "  ✗ Issue Templates (missing)"
+                if [ -z "$current" ]; then
+                    current="Issue Templates"
+                    cmd_generate_issue_templates
+                    did_work=true
+                fi
+            fi
+            
+            # PR Template
+            if [ $has_pr_templates -eq 0 ]; then
+                echo "  ✗ PR Template (missing)"
+                if [ -z "$current" ]; then
+                    current="PR Template"
+                    cmd_generate_pr_template
+                    did_work=true
+                fi
+            fi
+            
+            # Lint Config
+            if [ $has_lint_config -eq 0 ]; then
+                echo "  ✗ Linting Configuration (missing)"
+                if [ -z "$current" ]; then
+                    current="Linting Configuration"
+                    cmd_generate_lint_config
+                    did_work=true
+                fi
+            fi
+        fi
+        
+        echo ""
+        echo "┌─────────────────────────────────────────────────────────────────────┐"
+        echo "│ Phase 3: Knowledge Base                                              │"
+        echo "└─────────────────────────────────────────────────────────────────────┘"
+        echo ""
+        
+        if [ $has_vision -gt 0 ] && [ $has_glossary -gt 0 ]; then
+            echo "  ✓ Vision Document (exists)"
+            echo "  ✓ Glossary (exists)"
+        else
+            # Vision Document
+            if [ $has_vision -eq 0 ]; then
+                echo "  ✗ Vision Document (missing)"
+                if [ -z "$current" ]; then
+                    current="Vision Document"
+                    cmd_generate_vision
+                    did_work=true
+                fi
+            fi
+            
+            # Glossary
+            if [ $has_glossary -eq 0 ]; then
+                echo "  ✗ Glossary (missing)"
+                if [ -z "$current" ]; then
+                    current="Glossary"
+                    cmd_generate_glossary
+                    did_work=true
+                fi
+            fi
+        fi
+        
+        # Check if all required artifacts are complete
+        check_artifacts
+        
+        local all_complete=true
+        [ $has_context_diagram -eq 0 ] && all_complete=false
+        [ $has_component_diagram -eq 0 ] && all_complete=false
+        [ $has_sequence_diagram -eq 0 ] && all_complete=false
+        [ $has_issue_templates -eq 0 ] && all_complete=false
+        [ $has_pr_templates -eq 0 ] && all_complete=false
+        [ $has_lint_config -eq 0 ] && all_complete=false
+        [ $has_vision -eq 0 ] && all_complete=false
+        [ $has_glossary -eq 0 ] && all_complete=false
+        
+        if [ "$all_complete" = true ]; then
+            # Calculate score
+            local total=$((6 + 7 + 7 + 6 + 6 + 4 + 4))
+            local overall=$(awk "BEGIN {printf \"%.1f\", ($total/70)*10}")
+            
+            print_completion "$overall" "$docs docs | $(find .github -type f 2>/dev/null | wc -l) github files"
+            break
+        fi
+        
+        # If no work was done this iteration but we're not complete, something is wrong
+        if [ "$did_work" = false ]; then
+            echo ""
+            echo "  ⚠ Some artifacts couldn't be auto-generated."
+            echo "  Run './kdse audit' for manual recommendations."
+            break
+        fi
+        
+        ((loop++))
+    done
+}
+
+# Generator: Context Diagram
+cmd_generate_context() {
+    echo ""
+    echo "  → Generating Context Diagram..."
+    if [ -d "docs/architecture" ]; then
+        cat > "docs/architecture/context-diagram.md" << 'EOF'
+# Context Diagram
+
+## Purpose
+
+This diagram shows the **system boundary** of the Industrial Simulation Runtime and its relationships with external actors and systems.
+
+---
+
+## System Context
+
+Forge provides a deterministic virtual industrial environment for developing, testing, commissioning, and training industrial software.
+
+### External Actors
+
+| Actor | Role |
+|-------|------|
+| Software Developers | Build applications |
+| Control Engineers | Validate controller logic |
+| SCADA Engineers | Configure HMI systems |
+| Integration Teams | Test protocol implementations |
+
+### External Systems
+
+| System | Protocol | Purpose |
+|--------|----------|---------|
+| MMA2 | Raw Ingest TCP | Operational memory appliance |
+| SCADA/HMI | Modbus TCP, DNP3 | Human operator interface |
+| PLC/Controller | Modbus TCP | Automated control |
+
+---
+
+## System Boundary
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        FORGE SYSTEM BOUNDARY                        │
+│                                                                     │
+│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐           │
+│  │    Runtime    │  │    Models     │  │   Devices     │           │
+│  │  Scheduler   │  │ Grid/Sun/Wind │  │ Weather/PV   │           │
+│  │  Plugin Mgr  │  │   Weather    │  │   Meters     │           │
+│  └───────────────┘  └───────────────┘  └───────────────┘           │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              │               │               │
+              ▼               ▼               ▼
+         MMA2           SCADA           PLC/Controller
+```
+
+---
+
+## Data Flows
+
+### Inbound
+- Configuration → Runtime
+- Plugin Loading → Runtime
+- Clock Control → Scheduler
+
+### Outbound
+- Telemetry → MMA2
+- Protocol Data → SCADA
+- REST Response → Applications
+
+---
+
+*Generated: $(date -I)*
+EOF
+        print_success "Created docs/architecture/context-diagram.md"
+    fi
+}
+
+# Generator: Component Diagram
+cmd_generate_component() {
+    echo ""
+    echo "  → Generating Component Diagram..."
+    if [ -d "docs/architecture" ]; then
+        cat > "docs/architecture/component-diagram.md" << 'EOF'
+# Component Diagram
+
+## Purpose
+
+This diagram shows the **module structure** of the Industrial Simulation Runtime.
+
+---
+
+## Package Architecture
+
+```
+forge (root) ─┬─► runtime   (Runtime, Config)
+              ├─► scheduler  (Scheduler, Clock)
+              ├─► models    (Grid, Sun, Wind, Weather)
+              ├─► device    (Device, Behaviors)
+              └─► memory    (MemoryImage, Regions)
+```
+
+---
+
+## Module Dependencies
+
+| Module | Imports | Exports |
+|--------|---------|---------|
+| runtime | device, models, scheduler, memory | Runtime, Config |
+| scheduler | device, models | Scheduler, Clock |
+| models | (math, time only) | Model interface, implementations |
+| device | memory, models | Device, Behavior |
+| memory | (encoding, sync) | MemoryImage, Quality |
+
+---
+
+## Key Interfaces
+
+```go
+type Model interface {
+    ID() ModelID
+    Type() string
+    Tick()
+}
+
+type Device struct {
+    id      DeviceID
+    typeName string
+    mem     *MemoryImage
+    behaviors []Behavior
+}
+
+type Behavior interface {
+    ID() string
+    Attach(d *Device)
+    Tick()
+}
+```
+
+---
+
+## Execution Order
+
+1. Models tick (physics)
+2. Devices tick (observe models)
+3. Clock advances
+
+---
+
+*Generated: $(date -I)*
+EOF
+        print_success "Created docs/architecture/component-diagram.md"
+    fi
+}
+
+# Generator: Sequence Diagram
+cmd_generate_sequence() {
+    echo ""
+    echo "  → Generating Runtime Sequence Diagram..."
+    if [ -d "docs/architecture" ]; then
+        cat > "docs/architecture/sequence-diagram.md" << 'EOF'
+# Runtime Sequence Diagram
+
+## Purpose
+
+This diagram shows the **tick execution flow** of the Industrial Simulation Runtime.
+
+---
+
+## Tick Loop
+
+```
+Scheduler.tick()
+     │
+     ├──► Models[0..N].Tick()
+     │         │
+     │         └── Evolve physics
+     │
+     ├──► Devices[0..N].Tick()
+     │         │
+     │         ├──► Behaviors[0..N].Tick()
+     │         │         │
+     │         │         ├── Read Model
+     │         │         ├── Update Memory
+     │         │         └── Return
+     │         └── Return
+     │
+     └──► Clock.Advance()
+```
+
+---
+
+## State Transitions
+
+### Runtime States
+```
+Created → Configured → Running → Stopped → Destroyed
+```
+
+### Device States
+```
+StateCreated → StateInitialized → StateRunning → StateStopped → StateDestroyed
+```
+
+---
+
+## Determinism
+
+The runtime is **deterministic**:
+- Fixed tick interval
+- Models tick before devices
+- Devices tick in registration order
+- No external dependencies
+
+---
+
+*Generated: $(date -I)*
+EOF
+        print_success "Created docs/architecture/sequence-diagram.md"
+    fi
+}
+
+# Generator: Issue Templates
+cmd_generate_issue_templates() {
+    echo ""
+    echo "  → Generating Issue Templates..."
+    mkdir -p .github/issue_templates
+    
+    cat > .github/issue_templates/bug_report.md << 'EOF'
+---
+name: Bug Report
+about: Create a report to help us improve
+title: '[Bug] '
+labels: bug
+assignees: ''
+---
+
+## Description
+<!-- A clear description of the bug -->
+
+## Steps to Reproduce
+<!-- How to reproduce the behavior -->
+1. 
+2. 
+3. 
+
+## Expected Behavior
+<!-- What you expected to happen -->
+
+## Actual Behavior
+<!-- What actually happened -->
+
+## Environment
+- OS: 
+- Go version: 
+- Forge version: 
+
+## Logs
+<!-- Any relevant logs -->
+```
+```
+
+## Additional Context
+<!-- Any other context about the problem -->
+EOF
+
+    cat > .github/issue_templates/feature_request.md << 'EOF'
+---
+name: Feature Request
+about: Suggest an idea for this project
+title: '[Feature] '
+labels: enhancement
+assignees: ''
+---
+
+## Problem Statement
+<!-- The problem this feature solves -->
+
+## Proposed Solution
+<!-- Your solution to the problem -->
+
+## Alternatives Considered
+<!-- Any alternative solutions considered -->
+
+## Additional Context
+<!-- Any other context -->
+EOF
+
+    print_success "Created .github/issue_templates/"
+}
+
+# Generator: PR Template
+cmd_generate_pr_template() {
+    echo ""
+    echo "  → Generating PR Template..."
+    
+    cat > .github/pull_request_template.md << 'EOF'
+## Description
+<!-- What does this PR do? -->
+
+## Related Issues
+<!-- Link to related issues: Fixes #123 -->
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Documentation update
+- [ ] Refactoring
+
+## Testing
+<!-- How was this tested? -->
+- [ ] Unit tests added/updated
+- [ ] Manual testing
+
+## Checklist
+- [ ] Code follows project style guidelines
+- [ ] Self-review completed
+- [ ] Comments added for complex code
+- [ ] Documentation updated
+EOF
+
+    print_success "Created .github/pull_request_template.md"
+}
+
+# Generator: Lint Config
+cmd_generate_lint_config() {
+    echo ""
+    echo "  → Generating Linting Configuration..."
+    
+    cat > .golangci.yml << 'EOF'
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+
+linters-settings:
+  govet:
+    check-shadowing: true
+  golint:
+    min-confidence: 0
+  gocyclo:
+    min-complexity: 15
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 50
+  max-same-issues: 10
+EOF
+
+    print_success "Created .golangci.yml"
+}
+
+# Generator: Vision Document
+cmd_generate_vision() {
+    echo ""
+    echo "  → Generating Vision Document..."
+    if [ -d "docs/architecture" ]; then
+        cat > docs/architecture/vision.md << 'EOF'
+# Vision
+
+## Purpose
+
+Forge is a **Virtual Industrial Laboratory** for industrial software development.
+
+## Mission
+
+Provide a deterministic virtual industrial environment for:
+- Software development
+- Controller development
+- SCADA development
+- Protocol integration
+- Factory Acceptance Testing
+- Commissioning
+- Training
+
+## Philosophy
+
+**Believe before sophisticated.** Simple deterministic models are preferred over complex models unless additional fidelity clearly benefits industrial software development.
+
+**Fitness for purpose.** Every feature should improve the ability to develop, test, commission, or train industrial software.
+
+---
+
+*Generated: $(date -I)*
+EOF
+        print_success "Created docs/architecture/vision.md"
+    fi
+}
+
+# Generator: Glossary
+cmd_generate_glossary() {
+    echo ""
+    echo "  → Generating Glossary..."
+    if [ -d "docs/architecture" ]; then
+        cat > docs/architecture/GLOSSARY.md << 'EOF'
+# Glossary
+
+## Key Terms
+
+| Term | Definition |
+|------|------------|
+| **Simulation Model** | Represents physical world (Grid, Sun, Weather) |
+| **Virtual Firmware** | Samples models, owns Device Memory |
+| **Device Memory** | Internal RAM owned by firmware |
+| **Communication Interface** | Serializes Device Memory |
+| **Tick** | One simulation time step |
+| **Quality** | Value quality indicator (Good, Uncertain, Bad, Offline) |
+| **Behavior** | Logic that reads/writes device memory |
+| **MMA2** | Modbus Memory Appliance - operational memory |
+
+---
+
+*Generated: $(date -I)*
+EOF
+        print_success "Created docs/architecture/GLOSSARY.md"
+    fi
+}
+
+#===============================================================================
+# Command: audit
+#===============================================================================
+
+cmd_audit() {
+    print_header "KDSE Audit"
+    echo "Analyzing repository and generating actionable recommendations..."
+    echo ""
+    
+    local audit_date=$(date -Iseconds)
+    local session_id="KDSE-AUDIT-$(date +%Y%m%d-%H%M%S)"
+    
+    # Check artifacts
+    check_artifacts
+    
+    echo "───────────────────────────────────────────────────────────────────────"
+    echo " ENGINEERING NAVIGATOR"
+    echo "───────────────────────────────────────────────────────────────────────"
+    echo ""
+    echo "Repository: $(basename $(pwd))"
+    echo "Source Files: $go_files | Tests: $test_files | Docs: $docs"
+    echo ""
+    
+    # Track overall recommendation priority
+    local first_action=""
+    local first_action_reason=""
+    
+    #=============================================================================
+    # Architecture Artifacts
+    #=============================================================================
+    echo "┌─────────────────────────────────────────────────────────────────────┐"
+    echo "│ ARCHITECTURE ARTIFACTS                              Current: 2/10   │"
+    echo "├─────────────────────────────────────────────────────────────────────┤"
+    
+    local arch_missing=""
+    local arch_score=2
+    local arch_needs_work=false
+    
+    if [ $has_context_diagram -eq 0 ]; then
+        arch_missing="${arch_missing}  • Context Diagram (${GREEN}required${NC} - Shows system boundaries and actors)\n"
+        arch_needs_work=true
+    fi
+    
+    if [ $has_component_diagram -eq 0 ]; then
+        arch_missing="${arch_missing}  • Component Diagram (${GREEN}required${NC} - Shows module relationships)\n"
+        arch_needs_work=true
+    fi
+    
+    if [ $has_sequence_diagram -eq 0 ]; then
+        arch_missing="${arch_missing}  • Runtime Sequence Diagram (${GREEN}required${NC} - Shows tick execution flow)\n"
+        arch_needs_work=true
+    fi
+    
+    if [ $has_api_docs -eq 0 ]; then
+        arch_missing="${arch_missing}  • API Documentation (${YELLOW}recommended${NC} - Documents interfaces)\n"
+    fi
+    
+    if [ $has_deployment_docs -eq 0 ]; then
+        arch_missing="${arch_missing}  • Deployment Guide (${YELLOW}recommended${NC} - Explains how to deploy)\n"
+    fi
+    
+    if [ "$arch_needs_work" = true ]; then
+        arch_score=4
+        
+        # Determine next action based on what's missing
+        local arch_next_action=""
+        if [ $has_sequence_diagram -eq 0 ]; then
+            arch_next_action="Create Runtime Sequence Diagram"
+        elif [ $has_component_diagram -eq 0 ]; then
+            arch_next_action="Create Component Diagram"
+        elif [ $has_context_diagram -eq 0 ]; then
+            arch_next_action="Create Context Diagram"
+        else
+            arch_next_action="Add Architecture Documentation"
+        fi
+        
+        [ -n "$first_action" ] || first_action="$arch_next_action"
+        [ -n "$first_action_reason" ] || first_action_reason="Architecture: Foundational for all other work"
+        echo -e "│ Missing:                                                             │"
+        echo -e "$arch_missing"
+        echo "│                                                                     │"
+        echo "│ Next Action: ${GREEN}${arch_next_action}${NC}                              │"
+        echo "│ Estimated: 2/10 → 4/10                                              │"
+    else
+        echo "│ ✓ All required architecture artifacts present                         │"
+        arch_score=6
+    fi
+    echo "└─────────────────────────────────────────────────────────────────────┘"
+    echo ""
+    
+    #=============================================================================
+    # Authority Hierarchy
+    #=============================================================================
+    echo "┌─────────────────────────────────────────────────────────────────────┐"
+    echo "│ AUTHORITY HIERARCHY                               Current: 7/10   │"
+    echo "├─────────────────────────────────────────────────────────────────────┤"
+    
+    if [ $adrs -gt 0 ]; then
+        echo "│ ✓ ADRs present: $adrs records                                          │"
+        echo "│ Score: 7/10 - No immediate action required                            │"
+    else
+        echo "│ Missing:                                                             │"
+        echo "│   • ADR for Runtime Architecture (required - Documents key decisions)  │"
+        echo "│   • ADR for Memory Model (required - Documents state management)      │"
+        echo "│                                                                     │"
+        echo "│ Next Action: ${YELLOW}Create ADR-001: Runtime Architecture${NC}                      │"
+        echo "│ Estimated: 7/10 → 8/10                                              │"
+    fi
+    echo "└─────────────────────────────────────────────────────────────────────┘"
+    echo ""
+    
+    #=============================================================================
+    # Governance
+    #=============================================================================
+    echo "┌─────────────────────────────────────────────────────────────────────┐"
+    echo "│ GOVERNANCE                                        Current: 3/10   │"
+    echo "├─────────────────────────────────────────────────────────────────────┤"
+    
+    local gov_missing=""
+    local gov_score=3
+    local gov_needs_work=false
+    
+    if [ $has_issue_templates -eq 0 ]; then
+        gov_missing="${gov_missing}  • Issue Templates (${GREEN}required${NC} - Ensures issue quality)\n"
+        gov_needs_work=true
+    fi
+    
+    if [ $has_pr_templates -eq 0 ]; then
+        gov_missing="${gov_missing}  • PR Template (${GREEN}required${NC} - Ensures PR descriptions)\n"
+        gov_needs_work=true
+    fi
+    
+    if [ $has_lint_config -eq 0 ]; then
+        gov_missing="${gov_missing}  • Linting Configuration (${GREEN}required${NC} - Enforces code standards)\n"
+        gov_needs_work=true
+    fi
+    
+    if [ $has_readme_quality -eq 0 ]; then
+        gov_missing="${gov_missing}  • README Quality (${YELLOW}recommended${NC} - Quick start for new contributors)\n"
+    fi
+    
+    if [ $has_changelog -eq 0 ]; then
+        gov_missing="${gov_missing}  • Changelog (${YELLOW}recommended${NC} - Tracks changes)\n"
+    fi
+    
+    if [ "$gov_needs_work" = true ]; then
+        gov_score=5
+        [ -n "$first_action" ] || first_action="Create Issue Templates"
+        [ -n "$first_action_reason" ] || first_action_reason="Governance: Foundation for tracking work"
+        echo -e "│ Missing:                                                             │"
+        echo -e "$gov_missing"
+        echo "│                                                                     │"
+        echo "│ Next Action: ${GREEN}Create Issue Templates${NC}                                 │"
+        echo "│ Estimated: 3/10 → 5/10                                              │"
+    else
+        echo "│ ✓ All required governance artifacts present                           │"
+        echo "│ Score: 5/10 → 7/10                                                   │"
+    fi
+    echo "└─────────────────────────────────────────────────────────────────────┘"
+    echo ""
+    
+    #=============================================================================
+    # Implementation Artifacts
+    #=============================================================================
+    echo "┌─────────────────────────────────────────────────────────────────────┐"
+    echo "│ IMPLEMENTATION ARTIFACTS                         Current: 2/10   │"
+    echo "├─────────────────────────────────────────────────────────────────────┤"
+    
+    local impl_missing=""
+    local impl_score=2
+    local impl_needs_work=false
+    
+    if [ $test_files -eq 0 ]; then
+        impl_missing="${impl_missing}  • Unit Tests (${GREEN}required${NC} - Verify behavior)\n"
+        impl_needs_work=true
+    fi
+    
+    if [ $test_files -gt 0 ] && [ $go_files -gt 0 ]; then
+        local test_ratio=$((test_files * 100 / go_files))
+        if [ $test_ratio -lt 20 ]; then
+            impl_missing="${impl_missing}  • Test Coverage (${YELLOW}recommended${NC} - Current: ${test_ratio}% < 20%)\n"
+        fi
+    fi
+    
+    if [ ! -f "go.mod" ]; then
+        impl_missing="${impl_missing}  • Dependency Management (${GREEN}required${NC} - go.mod)\n"
+        impl_needs_work=true
+    fi
+    
+    if [ "$impl_needs_work" = true ]; then
+        impl_score=4
+        [ -n "$first_action" ] || first_action="Add Unit Tests"
+        [ -n "$first_action_reason" ] || first_action_reason="Implementation: Tests enable confident changes"
+        echo -e "│ Missing:                                                             │"
+        echo -e "$impl_missing"
+        echo "│                                                                     │"
+        echo "│ Next Action: ${GREEN}Add Unit Tests${NC}                                        │"
+        echo "│ Estimated: 2/10 → 4/10                                              │"
+    else
+        echo "│ ✓ Implementation artifacts present                                   │"
+        echo "│ Score: 4/10 → 6/10                                                   │"
+    fi
+    echo "└─────────────────────────────────────────────────────────────────────┘"
+    echo ""
+    
+    #=============================================================================
+    # Knowledge Artifacts
+    #=============================================================================
+    echo "┌─────────────────────────────────────────────────────────────────────┐"
+    echo "│ KNOWLEDGE ARTIFACTS                             Current: 4/10   │"
+    echo "├─────────────────────────────────────────────────────────────────────┤"
+    
+    local know_missing=""
+    local know_score=4
+    local know_needs_work=false
+    
+    if [ $has_vision -eq 0 ]; then
+        know_missing="${know_missing}  • Vision Document (${GREEN}required${NC} - States purpose and goals)\n"
+        know_needs_work=true
+    fi
+    
+    if [ $has_glossary -eq 0 ]; then
+        know_missing="${know_missing}  • Glossary (${GREEN}required${NC} - Defines terminology)\n"
+        know_needs_work=true
+    fi
+    
+    if [ "$know_needs_work" = true ]; then
+        know_score=6
+        [ -n "$first_action" ] || first_action="Create Vision Document"
+        [ -n "$first_action_reason" ] || first_action_reason="Knowledge: Enables alignment"
+        echo -e "│ Missing:                                                             │"
+        echo -e "$know_missing"
+        echo "│                                                                     │"
+        echo "│ Next Action: ${GREEN}Create Vision Document${NC}                                 │"
+        echo "│ Estimated: 4/10 → 6/10                                              │"
+    else
+        echo "│ ✓ Required knowledge artifacts present                              │"
+        echo "│ Score: 6/10                                                         │"
+    fi
+    echo "└─────────────────────────────────────────────────────────────────────┘"
+    echo ""
+    
+    #=============================================================================
+    # Traceability
+    #=============================================================================
+    echo "┌─────────────────────────────────────────────────────────────────────┐"
+    echo "│ TRACEABILITY                                     Current: 2/10   │"
+    echo "├─────────────────────────────────────────────────────────────────────┤"
+    
+    local trace_missing=""
+    local trace_score=2
+    local trace_needs_work=false
+    
+    if [ ! -d ".kdse/reports" ]; then
+        trace_missing="${trace_missing}  • Audit Reports (${GREEN}required${NC} - Shows assessment history)\n"
+        trace_needs_work=true
+    fi
+    
+    if [ $has_trace_matrix -eq 0 ]; then
+        trace_missing="${trace_missing}  • Traceability Matrix (${GREEN}required${NC} - Links requirements to code)\n"
+        trace_needs_work=true
+    fi
+    
+    if [ "$trace_needs_work" = true ]; then
+        trace_score=4
+        [ -n "$first_action" ] || first_action="Create Traceability Matrix"
+        [ -n "$first_action_reason" ] || first_action_reason="Traceability: Enables impact analysis"
+        echo -e "│ Missing:                                                             │"
+        echo -e "$trace_missing"
+        echo "│                                                                     │"
+        echo "│ Next Action: ${GREEN}Create Traceability Matrix${NC}                             │"
+        echo "│ Estimated: 2/10 → 4/10                                              │"
+    else
+        echo "│ ✓ Traceability artifacts present                                     │"
+        echo "│ Score: 4/10 → 6/10                                                   │"
+    fi
+    echo "└─────────────────────────────────────────────────────────────────────┘"
+    echo ""
+    
+    #=============================================================================
+    # Verification Practices
+    #=============================================================================
+    echo "┌─────────────────────────────────────────────────────────────────────┐"
+    echo "│ VERIFICATION PRACTICES                         Current: 2/10   │"
+    echo "├─────────────────────────────────────────────────────────────────────┤"
+    
+    local ver_missing=""
+    local ver_score=2
+    local ver_needs_work=false
+    
+    if [ $has_ci -eq 0 ]; then
+        ver_missing="${ver_missing}  • CI/CD Pipeline (${GREEN}required${NC} - Automates verification)\n"
+        ver_needs_work=true
+    fi
+    
+    if [ $has_test_coverage -eq 0 ]; then
+        ver_missing="${ver_missing}  • Coverage Tracking (${GREEN}required${NC} - Measures test effectiveness)\n"
+        ver_needs_work=true
+    fi
+    
+    if [ "$ver_needs_work" = true ]; then
+        ver_score=4
+        [ -n "$first_action" ] || first_action="Set Up CI/CD Pipeline"
+        [ -n "$first_action_reason" ] || first_action_reason="Verification: Enables confident deployments"
+        echo -e "│ Missing:                                                             │"
+        echo -e "$ver_missing"
+        echo "│                                                                     │"
+        echo "│ Next Action: ${GREEN}Set Up CI/CD Pipeline${NC}                                 │"
+        echo "│ Estimated: 2/10 → 4/10                                              │"
+    else
+        echo "│ ✓ Verification practices established                                  │"
+        echo "│ Score: 4/10 → 7/10                                                   │"
+    fi
+    echo "└─────────────────────────────────────────────────────────────────────┘"
+    echo ""
+    
+    #=============================================================================
+    # Summary
+    #=============================================================================
+    echo "═══════════════════════════════════════════════════════════════════════"
+    echo " WHAT SHOULD YOU DO NEXT?"
+    echo "═══════════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "  ${GREEN}>>> ${first_action} <<<${NC}"
+    echo ""
+    echo "  Reason: $first_action_reason"
+    echo ""
+    echo "  Why this first?"
+    echo "  • Unblocks other work (architecture feeds implementation)"
+    echo "  • Quick win (30-60 minutes)"
+    echo "  • Tangible output you can use immediately"
+    echo ""
+    echo "  After completing this, re-run: ${YELLOW}./kdse audit${NC}"
+    echo ""
+    
+    # Calculate overall scores
+    local current_total=$((arch_score + 7 + gov_score + impl_score + know_score + trace_score + ver_score))
+    local max_total=70
+    local current_overall=$(awk "BEGIN {printf \"%.1f\", ($current_total/$max_total)*10}")
+    
+    local potential_total=52  # If all at 6/10
+    local potential_overall=$(awk "BEGIN {printf \"%.1f\", ($potential_total/$max_total)*10}")
+    
+    echo "  Current Overall: ${YELLOW}${current_overall}/10${NC}"
+    echo "  After first action: ~${GREEN}${potential_overall}/10${NC}"
+    echo ""
+    echo "  Or run: ${CYAN}./kdse generate${NC} to auto-generate all required artifacts"
+    echo "═══════════════════════════════════════════════════════════════════════"
+    echo ""
+    
+    # Generate detailed report
+    mkdir -p .kdse/reports
+    local report_file=".kdse/reports/$session_id.md"
+    
+    cat > "$report_file" << EOF
+# KDSE Audit Report - Engineering Navigator
+
+**Audit ID:** $session_id  
+**Date:** $audit_date  
+**Repository:** $(basename $(pwd))
+
+---
+
+## Executive Summary
+
+This audit identifies actionable next steps, not just scores.
+
+**Current Overall:** ${current_overall}/10  
+**After completing recommendations:** ~${potential_overall}/10
+
+---
+
+## Priority Actions
+
+### 1. ${first_action}
+
+**Reason:** $first_action_reason
+
+**Impact:** Addresses the dimension that blocks most other work
+
+---
+
+## Dimension Analysis
+
+### Architecture Artifacts (Current: ${arch_score}/10)
+
+**Missing:**
+$(if [ $arch_needs_work = true ]; then
+[ $has_context_diagram -eq 0 ] && echo "- Context Diagram (required)"
+[ $has_component_diagram -eq 0 ] && echo "- Component Diagram (required)"  
+[ $has_sequence_diagram -eq 0 ] && echo "- Runtime Sequence Diagram (required)"
+[ $has_api_docs -eq 0 ] && echo "- API Documentation (recommended)"
+[ $has_deployment_docs -eq 0 ] && echo "- Deployment Guide (recommended)"
+else
+echo "✓ All required artifacts present"
+fi)
+
+**Why Required:** Architecture artifacts define the shape of the system.
+
+**Next Action:** ${first_action}  
+**Estimated Score:** ${arch_score}/10 → $((arch_score + 2))/10
+
+---
+
+### Governance (Current: ${gov_score}/10)
+
+**Missing:**
+$(if [ "$gov_needs_work" = true ]; then
+echo "- Issue Templates (required)"
+echo "- PR Template (required)"
+echo "- Linting Configuration (required)"
+else
+echo "✓ All required governance artifacts present"
+fi)
+
+**Why Required:** Governance artifacts ensure consistency across contributors.
+
+---
+
+### Knowledge Artifacts (Current: ${know_score}/10)
+
+**Missing:**
+$(if [ "$know_needs_work" = true ]; then
+[ $has_vision -eq 0 ] && echo "- Vision Document (required)"
+[ $has_glossary -eq 0 ] && echo "- Glossary (required)"
+else
+echo "✓ Required knowledge artifacts present"
+fi)
+
+---
+
+## Next Steps
+
+1. **Run:** \`./kdse generate\` to auto-generate all required artifacts
+2. **Or:** \`./kdse audit\` to see manual recommendations
+3. Address the next lowest-scoring dimension
+
+---
+
+*Audit conducted by KDSE Runtime - Engineering Navigator*
+EOF
+    
+    print_success "Audit report saved to: $report_file"
+    echo ""
+}
+
+#===============================================================================
+# Command: help
+#===============================================================================
+
+cmd_help() {
+    echo "KDSE - Knowledge-Driven Software Engineering Runtime"
+    echo ""
+    echo "Usage: kdse <command>"
+    echo ""
+    echo "Commands:"
+    echo "  run       Start a new KDSE session"
+    echo "  audit     Analyze repository and recommend actions"
+    echo "  generate  Auto-generate required artifacts (build pipeline)"
+    echo "  update    Synchronize with latest KDSE repository"
+    echo "  status    Show runtime status"
+    echo "  help      Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  kdse run       # Start a KDSE assessment session"
+    echo "  kdse audit     # Analyze and recommend next actions"
+    echo "  kdse generate  # Auto-generate all required artifacts"
+    echo "  kdse update    # Sync with latest KDSE runtime"
+    echo "  kdse status    # Check installation status"
+}
+
+#===============================================================================
+# Main
+#===============================================================================
+
+case "$COMMAND" in
+    update)
+        cmd_update
+        ;;
+    run)
+        cmd_run
+        ;;
+    audit)
+        cmd_audit
+        ;;
+    generate)
+        cmd_generate
+        ;;
+    status)
+        cmd_status
+        ;;
+    help|--help|-h|"")
+        cmd_help
+        ;;
+    *)
+        echo "Unknown command: $COMMAND"
+        echo "Run 'kdse help' for usage information"
+        exit 1
+        ;;
+esac

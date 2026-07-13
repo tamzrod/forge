@@ -1,0 +1,32 @@
+{
+  "schema": "https://kdse.dev/schemas/manifest/v1.0",
+  "version": "1.0.0",
+  "generated": "2026-07-11T00:00:00Z",
+  "installation": {
+    "installed_at": "2026-07-11T00:00:00Z",
+    "installation_method": "manual",
+    "source_repository": "https://github.com/tamzrod/KDSE",
+    "source_branch": "main"
+  },
+  "runtime": {
+    "version": "1.0.0",
+    "minimum_version": "1.0.0",
+    "compatible_standard": ">= 1.0.0",
+    "framework_version": "1.1"
+  },
+  "knowledge": {
+    "version": "1.0.0",
+    "fingerprint": null,
+    "initialized": false
+  },
+  "directories": {
+    "knowledge": ".kdse/knowledge",
+    "runtime": ".kdse/runtime",
+    "reports": ".kdse/reports",
+    "history": ".kdse/history",
+    "phase0": ".kdse/phase0",
+    "architecture": ".kdse/architecture",
+    "assessments": ".kdse/assessments"
+  },
+  "status": "NOT_INITIALIZED"
+}

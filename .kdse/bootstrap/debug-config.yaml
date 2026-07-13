@@ -1,0 +1,140 @@
+#===============================================================================
+# KDSE Debug Runtime Configuration
+#===============================================================================
+# Configuration for the KDSE Debug Runtime engine.
+#===============================================================================
+
+debug_runtime:
+  version: "1.0"
+  enabled: true
+
+#-------------------------------------------------------------------------------
+# Confidence Settings
+#-------------------------------------------------------------------------------
+confidence:
+  # Confidence threshold for root cause selection
+  threshold: 90
+  
+  # Initial confidence range for new hypotheses
+  minimum_initial: 20
+  maximum_initial: 60
+  
+  # Default initial confidence
+  default_initial: 40
+  
+  # Evidence impact values
+  impacts:
+    direct_error_trace: 20
+    test_failure_confirm: 15
+    log_message: 10
+    source_code_confirm: 10
+    configuration_enable: 5
+    partial_evidence: 5
+    contradicting_evidence: -25
+
+#-------------------------------------------------------------------------------
+# Hypothesis Settings
+#-------------------------------------------------------------------------------
+hypothesis:
+  # Maximum active hypotheses
+  max_active: 5
+  
+  # Auto-reject hypotheses below this confidence
+  auto_reject_below: 20
+  
+  # Status values
+  status:
+    - active
+    - evaluated
+    - rejected
+    - selected
+
+#-------------------------------------------------------------------------------
+# Evidence Settings
+#-------------------------------------------------------------------------------
+evidence:
+  # Collection timeout (seconds)
+  collection_timeout_seconds: 300
+  
+  # Auto-categorize evidence
+  auto_categorize: true
+  
+  # Evidence types
+  types:
+    - exception
+    - test_failure
+    - log
+    - source
+    - state
+    - config
+    - dependency
+
+#-------------------------------------------------------------------------------
+# Loop Detection Settings
+#-------------------------------------------------------------------------------
+loops:
+  # Enable loop detection
+  detection_enabled: true
+  
+  # Maximum repetitions before warning
+  max_repetitions: 3
+  
+  # Cooldown between similar actions (seconds)
+  cooldown_seconds: 60
+  
+  # Detectable patterns
+  patterns:
+    - file_inspection
+    - module_reload
+    - schema_check
+    - database_inspection
+    - cache_clear
+    - import_analysis
+
+#-------------------------------------------------------------------------------
+# Report Settings
+#-------------------------------------------------------------------------------
+reports:
+  # Default output format
+  output_format: "json"
+  
+  # Include evidence in reports
+  include_evidence: true
+  
+  # Include hypotheses in reports
+  include_hypotheses: true
+  
+  # Report directory
+  directory: ".kdse/debug/reports"
+
+#-------------------------------------------------------------------------------
+# Implementation Settings
+#-------------------------------------------------------------------------------
+implementation:
+  # Require operator approval before implementing
+  require_operator_approval: true
+  
+  # Auto-backup before implementing
+  auto_backup: true
+  
+  # Backup directory
+  backup_directory: ".kdse/debug/backups"
+
+#-------------------------------------------------------------------------------
+# Session Settings
+#-------------------------------------------------------------------------------
+sessions:
+  # Session directory
+  directory: ".kdse/debug/sessions"
+  
+  # Session file prefix
+  prefix: "DEBUG"
+  
+  # Evidence store file
+  evidence_store: "evidence/store.json"
+  
+  # Hypothesis registry file
+  hypothesis_registry: "hypotheses/registry.json"
+  
+  # Loop history file
+  loop_history: "loops/history.json"

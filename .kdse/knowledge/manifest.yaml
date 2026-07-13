@@ -1,0 +1,428 @@
+#===============================================================================
+# KDSE Knowledge Manifest
+#===============================================================================
+# This manifest defines the knowledge required for KDSE Runtime initialization.
+# Phase 0 loads this manifest and uses it to load all required knowledge.
+# AI agents shall NOT guess which documents to load.
+#===============================================================================
+
+version: "1.0"
+manifest_version: "1.0"
+generated: "2026-07-11"
+
+#-------------------------------------------------------------------------------
+# Runtime Metadata
+#-------------------------------------------------------------------------------
+runtime:
+  version: "1.0.0"
+  minimum_version: "1.0.0"
+  compatible_standard: ">= 1.0.0"
+  knowledge_version: "1.0.0"
+
+#-------------------------------------------------------------------------------
+# Required Knowledge
+#-------------------------------------------------------------------------------
+# These documents MUST be loaded before any engineering activity begins.
+# Loading order is explicitly defined - do not modify.
+#-------------------------------------------------------------------------------
+required_knowledge:
+
+  - id: core-principles
+    name: Core Principles
+    version: "1.0"
+    source: "docs/foundation/003-core-principles.md"
+    priority: 1
+    loading_order: 1
+    description: |
+      The 10 fundamental principles of Knowledge-Driven Software Engineering.
+      These principles are timeless and govern all KDSE activities.
+    capabilities:
+      - principles
+    checksum_required: true
+
+  - id: engineering-model
+    name: Engineering Model
+    version: "1.0"
+    source: "docs/foundation/004-engineering-model.md"
+    priority: 1
+    loading_order: 2
+    description: |
+      The five-stage engineering lifecycle: Knowledge, Architecture,
+      Implementation, Verification, Evolution.
+    capabilities:
+      - lifecycle
+    checksum_required: true
+
+  - id: chain-of-authority
+    name: Chain of Authority
+    version: "1.0"
+    source: "docs/foundation/006-chain-of-authority.md"
+    priority: 1
+    loading_order: 3
+    description: |
+      The authority hierarchy from Knowledge (highest) to Verification (lowest).
+      Defines how authority flows and cannot be contradicted.
+    capabilities:
+      - authority
+      - governance
+    checksum_required: true
+
+  - id: glossary
+    name: Glossary
+    version: "1.2"
+    source: "docs/foundation/007-glossary.md"
+    priority: 1
+    loading_order: 4
+    description: |
+      Canonical terminology for KDSE. Each term has exactly one definition.
+    capabilities:
+      - terminology
+    checksum_required: true
+
+  - id: session-protocol
+    name: Session Protocol
+    version: "1.0"
+    source: "runtime/SESSION_PROTOCOL.md"
+    priority: 1
+    loading_order: 5
+    description: |
+      Session lifecycle definition including phases, states, and transitions.
+    capabilities:
+      - session_management
+    checksum_required: true
+
+  - id: command-registry
+    name: Command Registry
+    version: "1.0"
+    source: "runtime/install/commands.yaml"
+    priority: 1
+    loading_order: 6
+    description: |
+      Machine-readable registry of all KDSE Runtime commands.
+    capabilities:
+      - command_interface
+    checksum_required: true
+
+  - id: runtime-configuration
+    name: Runtime Configuration
+    version: "1.0"
+    source: "runtime/VERSIONING.md"
+    priority: 1
+    loading_order: 7
+    description: |
+      Runtime versioning strategy and version compatibility policy.
+    capabilities:
+      - versioning
+    checksum_required: true
+
+#-------------------------------------------------------------------------------
+# Optional Knowledge
+#-------------------------------------------------------------------------------
+# These documents SHOULD be loaded for complete KDSE context.
+# Load after all required knowledge is successfully loaded.
+#-------------------------------------------------------------------------------
+optional_knowledge:
+
+  - id: engineering-knowledge
+    name: Engineering Knowledge Definition
+    version: "1.0"
+    source: "docs/foundation/009-engineering-knowledge.md"
+    priority: 2
+    loading_order: 8
+    description: |
+      Definition of what constitutes engineering knowledge in KDSE.
+    capabilities:
+      - knowledge_management
+    checksum_required: false
+
+  - id: traceability
+    name: Traceability Framework
+    version: "1.0"
+    source: "docs/foundation/012-traceability.md"
+    priority: 2
+    loading_order: 9
+    description: |
+      Framework for maintaining traceability between artifacts.
+    capabilities:
+      - traceability
+    checksum_required: false
+
+  - id: engineering-artifacts
+    name: Engineering Artifacts
+    version: "1.0"
+    source: "docs/foundation/005-engineering-artifacts.md"
+    priority: 2
+    loading_order: 10
+    description: |
+      Artifact type definitions and stewardship guidelines.
+    capabilities:
+      - artifact_management
+    checksum_required: false
+
+  - id: audit-standards
+    name: Audit Standards
+    version: "1.0"
+    source: "docs/audit/COMPLIANCE_AUDIT.md"
+    priority: 2
+    loading_order: 11
+    description: |
+      Compliance audit criteria and scoring methodology.
+    capabilities:
+      - audit
+      - compliance
+    checksum_required: false
+
+  - id: debug-runtime
+    name: Debug Runtime
+    version: "1.0"
+    source: "runtime/DEBUG_RUNTIME.md"
+    priority: 2
+    loading_order: 12
+    description: |
+      Evidence-driven debugging workflow with confidence-based root cause analysis.
+      Includes state machine, evidence types, hypothesis management, and loop detection.
+    capabilities:
+      - debugging
+      - evidence_collection
+      - root_cause_analysis
+    checksum_required: false
+
+  - id: debug-adr
+    name: Debug Runtime ADR
+    version: "1.0"
+    source: ".kdse/architecture/ADR-007-DEBUG_RUNTIME.md"
+    priority: 3
+    loading_order: 13
+    description: |
+      Architecture Decision Record for Debug Runtime feature.
+    capabilities:
+      - debugging
+    checksum_required: false
+
+#-------------------------------------------------------------------------------
+# Capability Definitions
+#-------------------------------------------------------------------------------
+# These capabilities are available after Phase 0 initialization completes.
+#-------------------------------------------------------------------------------
+capabilities:
+
+  - name: assessment
+    description: Repository compliance assessment
+    phase: Verification
+    entrypoint: "Run KDSE"
+    dependencies: []
+    required_knowledge:
+      - core-principles
+      - engineering-model
+      - chain-of-authority
+    workflow_steps:
+      - Initialize
+      - Verify Standards
+      - Assess Repository
+      - Generate Report
+      - Await Approval
+
+  - name: architecture
+    description: Architecture design and review
+    phase: Knowledge → Architecture
+    entrypoint: "Engineering Phase"
+    dependencies:
+      - assessment
+    required_knowledge:
+      - engineering-model
+      - chain-of-authority
+
+  - name: implementation
+    description: Implementation guidance
+    phase: Architecture → Implementation
+    entrypoint: "Engineering Phase"
+    dependencies:
+      - architecture
+    required_knowledge:
+      - engineering-model
+
+  - name: verification
+    description: Implementation verification
+    phase: Implementation → Verification
+    entrypoint: "Verification Phase"
+    dependencies:
+      - implementation
+    required_knowledge:
+      - chain-of-authority
+
+  - name: evolution
+    description: Methodology evolution
+    phase: Evolution
+    entrypoint: "Evolution Phase"
+    dependencies:
+      - verification
+    required_knowledge:
+      - engineering-model
+
+  - name: feedback
+    description: Feedback collection
+    phase: All
+    entrypoint: "Session Protocol"
+    dependencies: []
+    required_knowledge: []
+
+  - name: debugging
+    description: Evidence-driven debugging workflow
+    phase: Runtime
+    entrypoint: "kdse debug init"
+    dependencies: []
+    required_knowledge:
+      - debug-runtime
+
+  - name: evidence_collection
+    description: Structured evidence collection with types and tags
+    phase: Runtime
+    entrypoint: "kdse debug collect"
+    dependencies:
+      - debugging
+    required_knowledge:
+      - debug-runtime
+
+  - name: root_cause_analysis
+    description: Confidence-driven root cause analysis
+    phase: Runtime
+    entrypoint: "kdse debug select"
+    dependencies:
+      - debugging
+      - evidence_collection
+    required_knowledge:
+      - debug-runtime
+
+#-------------------------------------------------------------------------------
+# Command Registry Summary
+#-------------------------------------------------------------------------------
+# Commands available after Phase 0 initialization.
+# Full command definitions in runtime/install/commands.yaml.
+#-------------------------------------------------------------------------------
+commands:
+
+  session_management:
+    - Run KDSE
+    - Continue KDSE
+    - Close KDSE
+
+  session_control:
+    - Pause KDSE
+    - Resume KDSE
+
+  information:
+    - KDSE Status
+    - KDSE Report
+    - KDSE Progress
+    - KDSE Scores
+    - KDSE Findings
+    - KDSE History
+
+  decisions:
+    - Approve
+    - Reject
+    - Defer
+
+  administration:
+    - kdse install
+    - kdse update
+    - kdse verify
+    - kdse uninstall
+
+  debugging:
+    - kdse debug init
+    - kdse debug collect
+    - kdse debug hypothesis
+    - kdse debug evaluate
+    - kdse debug confidence
+    - kdse debug select
+    - kdse debug report
+    - kdse debug next
+    - kdse debug state
+    - kdse debug evidence
+    - kdse debug hypotheses
+
+#-------------------------------------------------------------------------------
+# Workflow Entrypoints
+#-------------------------------------------------------------------------------
+workflows:
+
+  run_session:
+    command: "Run KDSE"
+    description: "Start a new KDSE session"
+    phases:
+      - Phase 0: Initialize
+      - Phase 1: Verify Standards
+      - Phase 2: Assess Repository
+      - Phase 3: Generate Report
+      - Phase 4: Await Approval
+      - Phase 5: Implement
+      - Phase 6: Verify
+      - Phase 7: Complete
+
+  continue_session:
+    command: "Continue KDSE"
+    description: "Resume an existing session"
+    phases:
+      - Load Session State
+      - Continue from Last Phase
+
+  close_session:
+    command: "Close KDSE"
+    description: "End the current session"
+    phases:
+      - Finalize Report
+      - Record Metrics
+      - Close Session
+
+#-------------------------------------------------------------------------------
+# Initialization Configuration
+#-------------------------------------------------------------------------------
+initialization:
+  bootstrap_timeout_seconds: 30
+  max_retry_attempts: 3
+  retry_delay_seconds: 1
+  abort_on_missing_required: true
+  verify_checksums: true
+  generate_fingerprint: true
+  load_optional_by_default: true
+
+#-------------------------------------------------------------------------------
+# Core Principles (for quick reference)
+#-------------------------------------------------------------------------------
+core_principles:
+  - "Knowledge precedes architecture"
+  - "Architecture precedes implementation"
+  - "Implementation precedes verification"
+  - "Knowledge is the longest-lived artifact"
+  - "Engineering decisions must be traceable"
+  - "Code realizes knowledge"
+  - "Knowledge is language-independent"
+  - "Authority flows downward"
+  - "Verification confirms alignment"
+  - "Evolution maintains authority"
+
+#-------------------------------------------------------------------------------
+# Authority Hierarchy
+#-------------------------------------------------------------------------------
+authority_hierarchy:
+  highest: Knowledge
+  hierarchy:
+    - Knowledge
+    - Architecture
+    - Implementation
+    - Verification
+  lowest: Verification
+  rule: "Lower layers cannot contradict higher layers"
+
+#-------------------------------------------------------------------------------
+# Engineering Lifecycle
+#-------------------------------------------------------------------------------
+lifecycle:
+  stages:
+    - Knowledge
+    - Architecture
+    - Implementation
+    - Verification
+    - Evolution
+  flow: "Knowledge → Architecture → Implementation → Verification → Evolution"
