@@ -290,10 +290,10 @@ type BreakerTripScenario struct {
 // NewBreakerTrip creates a breaker trip scenario.
 func NewBreakerTrip() *BreakerTripScenario {
 	s := &BreakerTripScenario{
-		BaseScenario: NewBaseScenario("Breaker Trip", "Grid breaker trips open then recloses after delay", 60*time.Second),
+		BaseScenario: NewBaseScenario("Breaker Trip", "Protection relay trips breaker then recloses after fault", 60*time.Second),
 	}
-	s.AddAction(EventAction{Time: 10 * time.Second, Type: "breaker_open", Source: "grid-breaker", Data: map[string]interface{}{"breaker_id": "grid-breaker"}})
-	s.AddAction(EventAction{Time: 30 * time.Second, Type: "breaker_close", Source: "grid-breaker", Data: map[string]interface{}{"breaker_id": "grid-breaker"}})
+	s.AddAction(EventAction{Time: 10 * time.Second, Type: "fault", Source: "grid-breaker", Data: map[string]interface{}{"type": "overcurrent", "location": "pcc", "severity": float32(1.0)}})
+	s.AddAction(EventAction{Time: 30 * time.Second, Type: "reconnect_command", Data: map[string]interface{}{"reason": "reclose_after_fault"}})
 	return s
 }
 
@@ -305,10 +305,10 @@ type IslandingScenario struct {
 // NewIslanding creates an islanding scenario.
 func NewIslanding() *IslandingScenario {
 	s := &IslandingScenario{
-		BaseScenario: NewBaseScenario("Islanding Test", "Plant islanded from grid for testing", 2*time.Minute),
+		BaseScenario: NewBaseScenario("Islanding Test", "Planned plant isolation from grid", 2*time.Minute),
 	}
-	s.AddAction(EventAction{Time: 15 * time.Second, Type: "breaker_open", Source: "grid-breaker", Data: map[string]interface{}{"breaker_id": "grid-breaker"}})
-	s.AddAction(EventAction{Time: 75 * time.Second, Type: "breaker_close", Source: "grid-breaker", Data: map[string]interface{}{"breaker_id": "grid-breaker"}})
+	s.AddAction(EventAction{Time: 15 * time.Second, Type: "island_command", Source: "grid-breaker", Data: map[string]interface{}{"reason": "planned_test"}})
+	s.AddAction(EventAction{Time: 75 * time.Second, Type: "reconnect_command", Data: map[string]interface{}{"reason": "test_complete"}})
 	return s
 }
 
@@ -324,8 +324,8 @@ func NewLoadStep() *LoadStepScenario {
 		BaseScenario: NewBaseScenario("Load Step", "Auxiliary load increases by 50%", 45*time.Second),
 		stepChange:  7.5, // 50% increase from 5kW to 7.5kW
 	}
-	s.AddAction(EventAction{Time: 15 * time.Second, Type: "load_increase", Data: map[string]interface{}{"load_id": "aux-load", "power": s.stepChange}})
-	s.AddAction(EventAction{Time: 30 * time.Second, Type: "load_decrease", Data: map[string]interface{}{"load_id": "aux-load", "power": float32(5.0)}})
+	s.AddAction(EventAction{Time: 15 * time.Second, Type: "load_change", Data: map[string]interface{}{"load_id": "aux-load", "power": s.stepChange}})
+	s.AddAction(EventAction{Time: 30 * time.Second, Type: "load_change", Data: map[string]interface{}{"load_id": "aux-load", "power": float32(5.0)}})
 	return s
 }
 
@@ -341,8 +341,8 @@ func NewGeneratorTrip() *GeneratorTripScenario {
 		BaseScenario: NewBaseScenario("Generator Trip", "One generator trips offline then restarts", 90*time.Second),
 		generatorID: "gen-1",
 	}
-	s.AddAction(EventAction{Time: 20 * time.Second, Type: "generator_trip", Source: s.generatorID, Data: map[string]interface{}{"generator_id": s.generatorID}})
-	s.AddAction(EventAction{Time: 60 * time.Second, Type: "generator_start", Source: s.generatorID, Data: map[string]interface{}{"generator_id": s.generatorID}})
+	s.AddAction(EventAction{Time: 20 * time.Second, Type: "generator_fault", Source: s.generatorID, Data: map[string]interface{}{"generator_id": s.generatorID}})
+	s.AddAction(EventAction{Time: 60 * time.Second, Type: "generator_clear", Source: s.generatorID, Data: map[string]interface{}{"generator_id": s.generatorID}})
 	return s
 }
 
