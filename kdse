@@ -460,6 +460,146 @@ cmd_status() {
     if [ -d ".git" ]; then
         echo "  • Git repository: Yes"
     fi
+    
+    echo ""
+    
+    # Feedback count
+    if [ -d ".kdse/feedback" ]; then
+        local fb_count=$(find .kdse/feedback -name "*.md" 2>/dev/null | wc -l)
+        echo "  • Feedback items: $fb_count"
+    else
+        echo "  • Feedback items: 0"
+    fi
+}
+
+#===============================================================================
+# Command: feedback
+#===============================================================================
+
+cmd_feedback() {
+    print_header "KDSE Feedback"
+    echo "Recording an observation for methodology improvement..."
+    echo ""
+    
+    local feedback_dir=".kdse/feedback"
+    mkdir -p "$feedback_dir"
+    
+    # Get next feedback number
+    local next_num=1
+    if [ -d "$feedback_dir" ]; then
+        local last=$(find "$feedback_dir" -name "FB-*.md" 2>/dev/null | sort -r | head -1)
+        if [ -n "$last" ]; then
+            local last_num=$(echo "$last" | grep -oP 'FB-\K[0-9]+' | head -1)
+            if [ -n "$last_num" ]; then
+                next_num=$((last_num + 1))
+            fi
+        fi
+    fi
+    
+    local fb_num=$(printf "%04d" $next_num)
+    local today=$(date +%Y-%m-%d)
+    local title="${1:-Feedback Item ${fb_num}}"
+    local feedback_file="${feedback_dir}/FB-${fb_num}-$(echo "$title" | tr ' ' '-' | tr '[:upper:]' '[:lower:]').md"
+    
+    cat > "$feedback_file" << EOF
+# Feedback: ${title}
+
+**Feedback ID:** FB-${fb_num}  
+**Date:** ${today}  
+**Status:** Open  
+**Severity:** Enhancement  
+
+---
+
+## Observation
+
+<!-- What did you observe? -->
+
+---
+
+## Context
+
+<!-- What was the situation? -->
+
+---
+
+## Expected Behavior
+
+<!-- What should have happened? -->
+
+---
+
+## Actual Behavior
+
+<!-- What actually happened? -->
+
+---
+
+## Suggested Improvement
+
+<!-- How could KDSE be improved? -->
+
+---
+
+## Evidence
+
+<!-- What evidence supports this feedback? -->
+
+---
+
+## Severity
+
+- [ ] Bug - Blocks work
+- [ ] Enhancement - Improves methodology
+- [ ] Documentation - Improves clarity
+- [ ] Question - Needs clarification
+
+---
+
+*Feedback recorded via KDSE CLI*
+EOF
+    
+    echo "Created: $feedback_file"
+    echo ""
+}
+
+#===============================================================================
+# Command: feedback-list
+#===============================================================================
+
+cmd_feedback_list() {
+    print_header "KDSE Feedback List"
+    echo ""
+    
+    local feedback_dir=".kdse/feedback"
+    
+    if [ ! -d "$feedback_dir" ]; then
+        echo "No feedback items recorded."
+        echo ""
+        echo "Record feedback with: ./kdse feedback <title>"
+        return 0
+    fi
+    
+    local count=$(find "$feedback_dir" -name "*.md" 2>/dev/null | wc -l)
+    
+    if [ "$count" -eq 0 ]; then
+        echo "No feedback items recorded."
+        echo ""
+        echo "Record feedback with: ./kdse feedback <title>"
+        return 0
+    fi
+    
+    echo "Feedback Items: $count"
+    echo ""
+    
+    find "$feedback_dir" -name "*.md" -exec basename {} \; 2>/dev/null | sort | while read f; do
+        local id=$(echo "$f" | grep -oP 'FB-\K[0-9]+')
+        local title=$(grep "^# Feedback:" "$feedback_dir/$f" 2>/dev/null | sed 's/# Feedback: //' || echo "Untitled")
+        local status=$(grep "^**Status:**" "$feedback_dir/$f" 2>/dev/null | awk '{print $NF}' || echo "Open")
+        printf "  FB-%s  %-10s  %s\n" "$id" "$status" "$title"
+    done
+    
+    echo ""
 }
 
 #===============================================================================
@@ -1612,19 +1752,22 @@ cmd_help() {
     echo "Usage: kdse <command>"
     echo ""
     echo "Commands:"
-    echo "  run       Start a new KDSE session"
-    echo "  audit     Analyze repository and recommend actions"
-    echo "  generate  Auto-generate required artifacts (build pipeline)"
-    echo "  update    Synchronize with latest KDSE repository"
-    echo "  status    Show runtime status"
-    echo "  help      Show this help message"
+    echo "  run            Start a new KDSE session"
+    echo "  audit          Analyze repository and recommend actions"
+    echo "  generate       Auto-generate required artifacts (build pipeline)"
+    echo "  feedback       Record feedback for methodology improvement"
+    echo "  feedback-list  List all recorded feedback"
+    echo "  update         Synchronize with latest KDSE repository"
+    echo "  status         Show runtime status"
+    echo "  help           Show this help message"
     echo ""
     echo "Examples:"
-    echo "  kdse run       # Start a KDSE assessment session"
-    echo "  kdse audit     # Analyze and recommend next actions"
-    echo "  kdse generate  # Auto-generate all required artifacts"
-    echo "  kdse update    # Sync with latest KDSE runtime"
-    echo "  kdse status    # Check installation status"
+    echo "  kdse run            # Start a KDSE assessment session"
+    echo "  kdse audit          # Analyze and recommend next actions"
+    echo "  kdse generate       # Auto-generate all required artifacts"
+    echo "  kdse feedback       # Record a feedback item"
+    echo "  kdse feedback-list  # Show all feedback items"
+    echo "  kdse status         # Check installation status"
 }
 
 #===============================================================================
@@ -1643,6 +1786,13 @@ case "$COMMAND" in
         ;;
     generate)
         cmd_generate
+        ;;
+    feedback)
+        shift
+        cmd_feedback "$@"
+        ;;
+    feedback-list)
+        cmd_feedback_list
         ;;
     status)
         cmd_status
