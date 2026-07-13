@@ -8,6 +8,7 @@ import (
 	"github.com/tamzrod/forge/runtime"
 	"github.com/tamzrod/forge/scheduler"
 	"github.com/tamzrod/forge/simulation"
+	"github.com/tamzrod/forge/solver"
 	"github.com/tamzrod/forge/topology"
 )
 
@@ -57,6 +58,12 @@ type (
 
 	// Switch is a switching device in a branch.
 	Switch = topology.Switch
+
+	// Solver advances the simulation state.
+	Solver = solver.Solver
+
+	// ElectricalSolver calculates power balance.
+	ElectricalSolver = solver.ElectricalSolver
 )
 
 // Quality constants.
@@ -106,8 +113,11 @@ var LoadConfig = runtime.LoadConfig
 // DefaultConfig returns the default configuration.
 var DefaultConfig = runtime.DefaultConfig
 
-// New creates a new device with the given ID, type, and memory regions.
+// NewDevice creates a new device with the given ID, type, and memory regions.
 var NewDevice = device.New
 
 // NewMemory creates a new MemoryImage.
 var NewMemory = memory.New
+
+// NewElectricalSolver creates a new ElectricalSolver.
+var NewElectricalSolver = solver.NewElectricalSolver
