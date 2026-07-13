@@ -8,6 +8,7 @@ import (
 	"github.com/tamzrod/forge/runtime"
 	"github.com/tamzrod/forge/scheduler"
 	"github.com/tamzrod/forge/simulation"
+	"github.com/tamzrod/forge/topology"
 )
 
 // Re-export commonly used types.
@@ -41,6 +42,21 @@ type (
 
 	// Mode is the simulation mode.
 	Mode = simulation.Mode
+
+	// Network is the electrical network topology.
+	Network = topology.Network
+
+	// Bus is an electrical node.
+	Bus = topology.Bus
+
+	// Branch is a connection between buses.
+	Branch = topology.Branch
+
+	// Terminal is a connection point on an entity.
+	Terminal = topology.Terminal
+
+	// Switch is a switching device in a branch.
+	Switch = topology.Switch
 )
 
 // Quality constants.
