@@ -23,8 +23,18 @@ type Scheduler struct {
 
 // SimulationClock tracks elapsed simulation time.
 type SimulationClock struct {
-	elapsed  time.Duration
+	elapsed   time.Duration
 	tickCount uint64
+}
+
+// Elapsed returns the total elapsed simulation time.
+func (c SimulationClock) Elapsed() time.Duration {
+	return c.elapsed
+}
+
+// TickCount returns the number of ticks executed.
+func (c SimulationClock) TickCount() uint64 {
+	return c.tickCount
 }
 
 // New creates a new Scheduler.

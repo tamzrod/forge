@@ -154,7 +154,7 @@ func main() {
 			tickCount++
 			if *flagVerbose {
 				clock := rt.Scheduler().Clock()
-				fmt.Printf("[Tick %d] elapsed=%v\n", tickCount, clock.elapsed)
+				fmt.Printf("[Tick %d] elapsed=%v\n", tickCount, clock.Elapsed())
 				fmt.Printf("  Grid: %.1fV @ %.2fHz\n", grid.Voltage(), grid.Frequency())
 			} else {
 				fmt.Printf("\rRunning... Tick %d", tickCount)
