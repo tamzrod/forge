@@ -1,0 +1,106 @@
+.inspector {
+  width: 280px;
+  height: 100%;
+  background: white;
+  border-left: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.name {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.sections {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.section {
+  margin-bottom: 16px;
+}
+
+.section h4 {
+  margin: 0 0 8px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.property {
+  margin-bottom: 8px;
+}
+
+.property label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.unit {
+  font-size: 10px;
+  color: #999;
+}
+
+.property input,
+.property select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.property input:focus,
+.property select:focus {
+  outline: none;
+  border-color: #2196f3;
+}
+
+.property input[readonly] {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.property input[type="checkbox"] {
+  width: auto;
+  margin-left: 0;
+}
+
+.empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.empty p {
+  margin: 0;
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+}

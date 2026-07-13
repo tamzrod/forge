@@ -1,0 +1,134 @@
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: white;
+  border-top: 1px solid #e0e0e0;
+}
+
+.buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
+}
+
+.button:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button.run {
+  background: #4caf50;
+  border-color: #4caf50;
+  color: white;
+}
+
+.button.run:hover {
+  background: #43a047;
+}
+
+.button.pause {
+  background: #ff9800;
+  border-color: #ff9800;
+  color: white;
+}
+
+.button.pause:hover {
+  background: #fb8c00;
+}
+
+.speed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.speed label {
+  font-size: 12px;
+  color: #666;
+}
+
+.speed select {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  background: white;
+}
+
+.time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.timeLabel {
+  font-size: 12px;
+  color: #666;
+}
+
+.timeValue {
+  font-size: 14px;
+  font-weight: 600;
+  font-family: monospace;
+  color: #333;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.statusIndicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #999;
+}
+
+.statusIndicator.running {
+  background: #4caf50;
+  animation: pulse 1s infinite;
+}
+
+.statusIndicator.paused {
+  background: #ff9800;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.statusText {
+  font-size: 12px;
+  color: #666;
+}
