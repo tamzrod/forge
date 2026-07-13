@@ -656,36 +656,210 @@ This glossary defines every major architectural concept used throughout the proj
 
 ### Plugin
 
-**Definition:** A modular component that provides Simulation Models and Device Types for a specific domain.
+**Definition:** A modular component that provides capabilities for a specific engineering domain. Plugins contribute components, factories, validators, solvers, scenarios, and other domain-specific assets to Forge.
 
 **Ownership:** Plugin System
 
 **Related Terms:**
-- Plugin Domain
-- Simulation Runtime
+- Plugin Host
+- Plugin Manager
+- Plugin Contract
+- Domain Plugin
 
 **Common Misunderstandings:**
 - A Plugin is NOT the same as a Runtime
-- A Plugin does NOT modify core Runtime behavior
+- A Plugin does NOT modify Forge Core behavior
+- A Plugin must NEVER contain engineering logic that should be in Forge Core
 
-**Example:** The Energy Plugin provides Grid, Sun, Wind, and Weather models plus device implementations.
+**Example:** The Electrical Plugin provides Grid, Bus, Breaker, Transformer, and other electrical components.
 
 ---
 
-### Plugin Domain
+### Plugin Host
 
-**Definition:** A category of physical or industrial domain served by a Plugin.
+**Definition:** The infrastructure component that owns plugin lifecycle: discovery, registration, initialization, shutdown, context, and service access.
+
+**Ownership:** Forge Core
+
+**Related Terms:**
+- Plugin
+- Plugin Manager
+- Core Services
+
+**Common Misunderstandings:**
+- The Plugin Host does NOT contain engineering logic
+- The Plugin Host does NOT validate domain-specific connections
+
+**Example:** The Plugin Host discovers all registered plugins at startup and initializes them in dependency order.
+
+---
+
+### Plugin Manager
+
+**Definition:** The component that manages plugin lifecycle: loading, registering, initializing, shutting down, querying, and reporting status.
+
+**Ownership:** Forge Core
+
+**Related Terms:**
+- Plugin
+- Plugin Host
+
+**Common Misunderstandings:**
+- The Plugin Manager does NOT contain engineering logic
+- The Plugin Manager does NOT perform domain-specific validation
+
+**Example:** PluginManager.Load() discovers and loads all registered plugins without engineering knowledge.
+
+---
+
+### Plugin Contract
+
+**Definition:** The stable interface that defines what a plugin must implement and how it interacts with Forge Core. The contract ensures plugins can be added, removed, and updated independently.
 
 **Ownership:** Plugin System
 
 **Related Terms:**
 - Plugin
+- Core Services
 
 **Common Misunderstandings:**
-- Plugin Domain is NOT the same as Plugin
-- Plugin Domain defines the scope of a Plugin
+- The Plugin Contract is NOT implementation-specific
+- The Plugin Contract does NOT include internal plugin details
 
-**Example:** Energy, Water, and Manufacturing are Plugin Domains.
+**Example:** All plugins must implement the Plugin interface with ID(), Name(), Version(), Components(), and other methods.
+
+---
+
+### Plugin Lifecycle
+
+**Definition:** The sequence of states a plugin goes through: Discovered → Registered → Initialized → Running → Shutdown → Unregistered.
+
+**Ownership:** Plugin System
+
+**Related Terms:**
+- Plugin
+- Plugin Manager
+
+**Common Misunderstandings:**
+- Plugin Lifecycle is NOT application lifecycle
+- Plugins have their own independent lifecycle
+
+**States:**
+1. **Discovered** - Plugin found by Plugin Manager
+2. **Registered** - Plugin added to Plugin Manager
+3. **Initialized** - Plugin.OnInit() called
+4. **Running** - Plugin ready to provide services
+5. **Shutdown** - Plugin.OnShutdown() called
+6. **Unregistered** - Plugin removed from Plugin Manager
+
+---
+
+### Core Services
+
+**Definition:** Infrastructure services provided by Forge Core that plugins consume. Core Services are stable, domain-independent interfaces.
+
+**Ownership:** Forge Core
+
+**Related Terms:**
+- Plugin
+- Component Catalog
+- Factory Registry
+- Event Bus
+
+**Core Services:**
+| Service | Purpose |
+|---------|---------|
+| Component Catalog | Stores component metadata |
+| Factory Registry | Stores entity factories |
+| Event Bus | Publishes/subscribes to simulation events |
+| Scenario Registry | Stores scenario definitions |
+
+**Common Misunderstandings:**
+- Core Services do NOT contain engineering logic
+- Core Services do NOT validate domain-specific connections
+
+**Example:** The Component Catalog stores component descriptors without knowing about electrical or water domains.
+
+---
+
+### Domain Plugin
+
+**Definition:** A plugin that provides capabilities for a specific engineering domain (electrical, water, building, process, transportation, etc.).
+
+**Ownership:** Plugin System
+
+**Related Terms:**
+- Plugin
+- Engineering Domain
+
+**Common Misunderstandings:**
+- A Domain Plugin is NOT Forge Core
+- A Domain Plugin does NOT provide infrastructure
+
+**Example:** The Electrical Plugin provides electrical components, validators, and solver.
+
+---
+
+### Runtime Extension
+
+**Definition:** A plugin that extends Forge Core runtime capabilities without providing domain-specific assets.
+
+**Ownership:** Plugin System
+
+**Related Terms:**
+- Plugin
+- Core Services
+
+**Example:** A logging extension that adds structured logging without domain knowledge.
+
+---
+
+### Editor Extension
+
+**Definition:** A plugin that extends the Forge Editor UI with domain-specific editors, property panels, or visualization.
+
+**Ownership:** Plugin System
+
+**Related Terms:**
+- Plugin
+- Component Catalog
+
+**Common Misunderstandings:**
+- Editor Extensions do NOT modify core editor architecture
+- Editor Extensions consume Core Services
+
+**Example:** An electrical schematic editor that extends the property inspector with voltage/rating fields.
+
+---
+
+### Engineering Domain
+
+**Definition:** A category of physical or industrial systems (electrical, water, building, process, transportation, etc.).
+
+**Ownership:** Domain Plugin
+
+**Related Terms:**
+- Domain Plugin
+
+**Common Misunderstandings:**
+- An Engineering Domain is NOT Forge Core
+- An Engineering Domain requires a Domain Plugin
+
+**Example:** Electrical power distribution, water distribution networks, HVAC systems.
+
+---
+
+### Plugin Configuration
+
+**Definition:** Settings that control which plugins are loaded and their initialization parameters.
+
+**Ownership:** Forge Core
+
+**Related Terms:**
+- Plugin Manager
+- Configuration
+
+**Example:** `forge.yaml` specifies enabled plugins and their settings.
 
 ---
 

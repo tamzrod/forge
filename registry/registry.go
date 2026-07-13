@@ -121,11 +121,24 @@ type Connection struct {
 }
 
 // Registry is the component registry.
+//
+// The registry stores component metadata only. Domain-specific validation
+// is delegated to registered ConnectionValidators.
 type Registry struct {
 	mu         sync.RWMutex
 	components map[string]*ComponentDescriptor
 	categories map[string]*ComponentCategory
 	factories  map[string]ComponentFactory
+	validators map[string]ConnectionValidator
+}
+
+// ConnectionValidator validates domain-specific connections.
+type ConnectionValidator interface {
+	// Domain returns the domain this validator applies to.
+	Domain() string
+
+	// CanConnect validates whether two terminals can be connected.
+	CanConnect(source, target *TerminalDescriptor) (bool, error)
 }
 
 // New creates a new registry.
@@ -134,7 +147,15 @@ func New() *Registry {
 		components: make(map[string]*ComponentDescriptor),
 		categories: make(map[string]*ComponentCategory),
 		factories:  make(map[string]ComponentFactory),
+		validators: make(map[string]ConnectionValidator),
 	}
+}
+
+// RegisterValidator registers a connection validator for a domain.
+func (r *Registry) RegisterValidator(v ConnectionValidator) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.validators[v.Domain()] = v
 }
 
 // Global registry instance
@@ -287,18 +308,38 @@ func (r *Registry) CreateFromFactory(instance *ComponentInstance) (interface{}, 
 }
 
 // CanConnect checks if two terminals can be connected.
+//
+// Validation is delegated to registered ConnectionValidators based on the
+// domain. If no validator exists for a domain, the basic role-based rules
+// apply (through and observation terminals can connect anywhere).
 func (r *Registry) CanConnect(source, target *TerminalDescriptor) bool {
-	// Bus can connect to most things
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	// Basic role-based rules for any domain
+	// These are universal rules that don't require domain-specific knowledge
 	if source.Role == TerminalRoleThrough || target.Role == TerminalRoleThrough {
 		return true
 	}
-
-	// Observation terminals can connect anywhere
 	if source.Role == TerminalRoleObservation || target.Role == TerminalRoleObservation {
 		return true
 	}
 
-	// Voltage must match
+	// If either terminal has a domain, try to find a validator
+	if source.Domain != "" {
+		if v, ok := r.validators[source.Domain]; ok {
+			valid, _ := v.CanConnect(source, target)
+			return valid
+		}
+	}
+	if target.Domain != "" {
+		if v, ok := r.validators[target.Domain]; ok {
+			valid, _ := v.CanConnect(source, target)
+			return valid
+		}
+	}
+
+	// Fallback: allow connection if voltage matches
 	if source.Voltage != nil && target.Voltage != nil {
 		return *source.Voltage == *target.Voltage
 	}
@@ -344,4 +385,5 @@ func (r *Registry) Reset() {
 	r.components = make(map[string]*ComponentDescriptor)
 	r.categories = make(map[string]*ComponentCategory)
 	r.factories = make(map[string]ComponentFactory)
+	r.validators = make(map[string]ConnectionValidator)
 }
