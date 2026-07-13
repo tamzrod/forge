@@ -13,8 +13,18 @@ import (
 // EntityID uniquely identifies an entity in the world.
 type EntityID string
 
+// Solver is the interface for simulation solvers.
+// Solvers advance the simulation state.
+type Solver interface {
+	Name() string
+	Type() string
+	Tick(dt time.Duration)
+	Reset()
+	SetWorld(w World)
+}
+
 // World is the container for all simulated entities.
-// It owns the simulation state and advances all entities.
+// It delegates simulation evolution to a Solver.
 type World interface {
 	// AddEntity adds an entity to the world.
 	AddEntity(e Entity)
@@ -32,7 +42,7 @@ type World interface {
 	EntitiesByType(entityType string) []Entity
 
 	// Tick advances the world by one time step.
-	// All entities update their state.
+	// Delegates to the configured Solver.
 	Tick(dt time.Duration)
 
 	// Measurement returns a measurement by entity ID and name.
@@ -55,6 +65,12 @@ type World interface {
 
 	// SetClock sets the simulation clock.
 	SetClock(clock simulation.Clock)
+
+	// SetSolver sets the solver for this world.
+	SetSolver(s Solver)
+
+	// Solver returns the configured solver.
+	Solver() Solver
 
 	// Close cleans up the world.
 	Close()
@@ -221,6 +237,7 @@ type simpleWorld struct {
 	mu       sync.RWMutex
 	entities map[EntityID]Entity
 	clock    simulation.Clock
+	solver   Solver
 	events   []Event
 	eventID  int
 }
@@ -232,6 +249,23 @@ func NewWorld() World {
 		clock:    simulation.NewClock(),
 		events:   make([]Event, 0),
 	}
+}
+
+// SetSolver sets the solver for this world.
+func (w *simpleWorld) SetSolver(s Solver) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.solver = s
+	if s != nil {
+		s.SetWorld(w)
+	}
+}
+
+// Solver returns the configured solver.
+func (w *simpleWorld) Solver() Solver {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.solver
 }
 
 func (w *simpleWorld) AddEntity(e Entity) {
@@ -275,6 +309,17 @@ func (w *simpleWorld) EntitiesByType(entityType string) []Entity {
 }
 
 func (w *simpleWorld) Tick(dt time.Duration) {
+	// If a solver is configured, delegate to it
+	w.mu.RLock()
+	s := w.solver
+	w.mu.RUnlock()
+
+	if s != nil {
+		s.Tick(dt)
+		return
+	}
+
+	// Otherwise, use the default behavior
 	w.mu.Lock()
 	entities := make([]Entity, len(w.entities))
 	i := 0
