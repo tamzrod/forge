@@ -10,6 +10,7 @@ This directory contains architectural decision records for the Industrial Simula
 | [ADR-002](002-behavior-model.md) | Behavior Model Design | Accepted | 2026-07-11 |
 | [ADR-003](003-memory-model.md) | Memory Model Design | Accepted | 2026-07-11 |
 | [ADR-004](004-simulation-models.md) | Simulation Models Design | Accepted | 2026-07-11 |
+| [ADR-005](005-plugin-architecture-audit.md) | Plugin Architecture Audit | Accepted | 2026-07-13 |
 
 ---
 
