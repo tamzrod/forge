@@ -10,6 +10,24 @@ package plugin
 
 import "github.com/tamzrod/forge/world"
 
+// WorldTemplate defines a template for creating a simulation world.
+type WorldTemplate interface {
+	// ID returns the unique identifier for this template.
+	ID() string
+
+	// Name returns the human-readable name.
+	Name() string
+
+	// Description returns a description of the template.
+	Description() string
+
+	// Domain returns the domain this template belongs to.
+	Domain() string
+
+	// Build creates a new world from this template.
+	Build() (world.World, error)
+}
+
 // Plugin is the contract that all Forge plugins must implement.
 //
 // Plugins contribute capabilities to Forge without modifying Core.
@@ -39,6 +57,18 @@ type Plugin interface {
 	// OnShutdown is called when the plugin is being unloaded.
 	// Use this to clean up resources.
 	OnShutdown() error
+
+	// Components returns all component descriptors provided by this plugin.
+	Components() []*ComponentDescriptor
+
+	// Categories returns all component categories.
+	Categories() []*ComponentCategory
+
+	// Validators returns connection validators for this domain.
+	Validators() []ConnectionValidator
+
+	// Templates returns world templates provided by this plugin.
+	Templates() []WorldTemplate
 }
 
 // Context provides access to Core Services during plugin initialization.

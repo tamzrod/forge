@@ -881,6 +881,251 @@ This glossary defines every major architectural concept used throughout the proj
 
 ---
 
+## Forge Core Architecture
+
+### World
+
+**Definition:** The container for all simulated entities. It provides entity management, tick coordination, event publishing, and delegates simulation evolution to registered solvers.
+
+**Ownership:** Forge Core
+
+**Related Terms:**
+- Entity
+- Solver
+- Event
+
+**Common Misunderstandings:**
+- World does NOT contain domain logic
+- World does NOT validate connections
+
+**Example:** `world.NewWorld()` creates an empty simulation world.
+
+---
+
+### Entity
+
+**Definition:** The base unit of simulation. Entities have identity, state, inputs, outputs, and capabilities. They tick each simulation step and publish measurements.
+
+**Ownership:** Forge Core (interface); Domain Plugins (implementations)
+
+**Related Terms:**
+- World
+- Capability
+- Measurement
+
+**Common Misunderstandings:**
+- An Entity is NOT the same as a Component
+- An Entity does NOT know about topology
+
+**Entity Interface:**
+```go
+type Entity interface {
+    ID() EntityID
+    Type() string
+    Capabilities() []Capability
+    Tick(dt time.Duration)
+    Measurements() []Measurement
+    Inputs() []Input
+    Outputs() []Output
+    HandleEvent(evt Event)
+    Connect(inputName string, source EntityID, outputName string)
+}
+```
+
+---
+
+### Capability
+
+**Definition:** A declared ability of an entity that Forge Core can reason about. Capabilities are domain-independent abstractions that replace equipment-centric assumptions.
+
+**Ownership:** Forge Core
+
+**Related Terms:**
+- Entity
+- Produce
+- Consume
+- Store
+- Transform
+- Transport
+- Switch
+- Measure
+- Protect
+- Communicate
+
+**Common Misunderstandings:**
+- A Capability is NOT an equipment type
+- A Capability does NOT imply specific implementation
+
+**Example:** A battery has Produce, Consume, and Store capabilities. A solar panel has Produce capability only.
+
+---
+
+### Capability Types
+
+| Capability | Description | Example Entities |
+|------------|-------------|-----------------|
+| **Produce** | Generates or injects energy/material | Generator, Solar Panel, Pump |
+| **Consume** | Uses or withdraws energy/material | Load, Motor, Compressor |
+| **Store** | Holds energy/material in storage | Battery, Tank, Reservoir |
+| **Transform** | Changes energy/material form | Transformer, Converter |
+| **Transport** | Moves energy/material through network | Cable, Pipe, Conveyor |
+| **Switch** | Can interrupt flow | Breaker, Valve, Relay |
+| **Measure** | Observes and records values | Meter, Sensor, Gauge |
+| **Protect** | Responds to abnormal conditions | Relay, Fuse, Protection |
+| **Communicate** | Sends/receives data | RTU, Gateway, Controller |
+
+---
+
+### World Template
+
+**Definition:** A predefined initialization of a simulation world with entities, connections, and configuration. Templates provide starting points for common simulation scenarios.
+
+**Ownership:** Domain Plugins
+
+**Related Terms:**
+- World
+- Entity
+- Plugin
+
+**Common Misunderstandings:**
+- A World Template is NOT a simulation model
+- A World Template does NOT run the simulation
+
+**Example Templates:**
+- Empty World (minimal starting point)
+- Solar Farm (solar + storage + grid)
+- Battery Storage (battery + inverter + grid)
+- Microgrid (generation + storage + loads)
+- Industrial Facility (process + utilities)
+
+---
+
+### Solver
+
+**Definition:** An algorithm that advances the simulation state. Solvers own evaluation order, dependency resolution, and state propagation across entities.
+
+**Ownership:** Forge Core (interface); Domain Plugins (implementations)
+
+**Related Terms:**
+- World
+- Entity
+
+**Common Misunderstandings:**
+- A Solver is NOT a physics engine
+- A Solver does NOT know about specific entity types
+
+**Example:** The ElectricalSolver balances power generation and consumption in an electrical network.
+
+---
+
+### Topology
+
+**Definition:** The structural relationships between entities. Topology defines connectivity without owning entity behavior.
+
+**Ownership:** Forge Core (interface); Domain Plugins (implementations)
+
+**Related Terms:**
+- Entity
+- Terminal
+- Connection
+
+**Common Misunderstandings:**
+- Topology is NOT domain-specific (though implementations may be)
+- Topology does NOT perform calculations
+
+**Example:** Electrical topology defines buses, branches, and switches. Water topology defines nodes and pipes.
+
+---
+
+### Terminal
+
+**Definition:** A connection point on an entity where flow enters or exits. Terminals have roles, directions, and optional domain-specific attributes.
+
+**Ownership:** Forge Core
+
+**Related Terms:**
+- Entity
+- Topology
+- Capability
+
+**Common Misunderstandings:**
+- A Terminal is NOT a physical connector
+- A Terminal does NOT validate compatibility
+
+**Example:** An electrical terminal has voltage. A water terminal has pressure.
+
+---
+
+### Event
+
+**Definition:** A notification that something happened in the simulation. Events are published by entities and consumed by interested parties.
+
+**Ownership:** Forge Core
+
+**Related Terms:**
+- World
+- Entity
+- Event Bus
+
+**Common Misunderstandings:**
+- An Event is NOT the same as a measurement
+- An Event does NOT modify entity state directly
+
+**Example:** A breaker opening generates a "breaker_opened" event.
+
+---
+
+### EntityRegistry
+
+**Definition:** A service that tracks and queries entities in the world. Plugins use EntityRegistry to register domain entities.
+
+**Ownership:** Forge Core
+
+**Related Terms:**
+- World
+- Entity
+
+**Example:** `registry.EntitiesByCapability(CapabilityProduce)` returns all entities that can produce.
+
+---
+
+### WorldBuilder
+
+**Definition:** A fluent builder for constructing simulation worlds. WorldBuilder provides a DSL for adding entities and connections.
+
+**Ownership:** Forge Core
+
+**Related Terms:**
+- World
+- World Template
+- Entity
+
+**Example:**
+```go
+builder := world.NewBuilder()
+builder.AddEntity("solar", "solar-panel").
+       AddEntity("battery", "battery").
+       Connect("solar", "output", "battery", "input").
+       Build()
+```
+
+---
+
+### ConnectionValidator
+
+**Definition:** Validates whether two entities can be connected based on their terminals and capabilities.
+
+**Ownership:** Domain Plugins
+
+**Related Terms:**
+- Terminal
+- Capability
+- Plugin
+
+**Example:** Electrical validator checks voltage compatibility. Water validator checks flow rate compatibility.
+
+---
+
 ## Reserved Terms
 
 These words have specific meanings in Forge and require careful use:

@@ -13,6 +13,31 @@ import (
 // EntityID uniquely identifies an entity in the world.
 type EntityID string
 
+// Capability represents what an entity can do in the simulation.
+// Capabilities are domain-independent abstractions.
+type Capability string
+
+const (
+	// CapabilityProduce generates or injects energy/material into the network.
+	CapabilityProduce Capability = "produce"
+	// CapabilityConsume uses or withdraws energy/material from the network.
+	CapabilityConsume Capability = "consume"
+	// CapabilityStore holds energy/material in storage.
+	CapabilityStore Capability = "store"
+	// CapabilityTransform changes energy/material form (e.g., AC/DC conversion).
+	CapabilityTransform Capability = "transform"
+	// CapabilityTransport moves energy/material through the network.
+	CapabilityTransport Capability = "transport"
+	// CapabilitySwitch can interrupt flow in the network.
+	CapabilitySwitch Capability = "switch"
+	// CapabilityMeasure observes and records values without affecting the network.
+	CapabilityMeasure Capability = "measure"
+	// CapabilityProtect responds to abnormal conditions.
+	CapabilityProtect Capability = "protect"
+	// CapabilityCommunicate sends or receives data.
+	CapabilityCommunicate Capability = "communicate"
+)
+
 // Solver is the interface for simulation solvers.
 // Solvers advance the simulation state.
 type Solver interface {
@@ -40,6 +65,12 @@ type World interface {
 
 	// EntitiesByType returns entities matching a type.
 	EntitiesByType(entityType string) []Entity
+
+	// EntitiesByCapability returns entities that have the given capability.
+	EntitiesByCapability(capability Capability) []Entity
+
+	// EntitiesByCapabilities returns entities that have all of the given capabilities.
+	EntitiesByCapabilities(capabilities []Capability) []Entity
 
 	// Tick advances the world by one time step.
 	// Delegates to the configured Solver.
@@ -81,8 +112,12 @@ type Entity interface {
 	// ID returns the entity's unique identifier.
 	ID() EntityID
 
-	// Type returns the entity type name.
+	// Type returns the entity type name (e.g., "grid", "battery", "pump").
 	Type() string
+
+	// Capabilities returns the entity's capabilities.
+	// These are domain-independent abstractions.
+	Capabilities() []Capability
 
 	// Tick updates the entity state for one time step.
 	// dt is the elapsed time since the last tick.
@@ -102,6 +137,19 @@ type Entity interface {
 
 	// Connect connects this entity to another via an input.
 	Connect(inputName string, source EntityID, outputName string)
+
+	// HasCapability returns true if the entity has the given capability.
+	HasCapability(capability Capability) bool
+}
+
+// HasCapability returns true if the entity has the given capability.
+func (e *BaseEntity) HasCapability(capability Capability) bool {
+	for _, c := range e.capabilities {
+		if c == capability {
+			return true
+		}
+	}
+	return false
 }
 
 // Input represents an input channel to an entity.
@@ -136,21 +184,35 @@ type Event struct {
 
 // BaseEntity provides common functionality for entities.
 type BaseEntity struct {
-	id         EntityID
-	entityType string
-	inputs     map[string]Input
-	outputs    map[string]Output
+	id          EntityID
+	entityType  string
+	capabilities []Capability
+	inputs      map[string]Input
+	outputs     map[string]Output
 	connections map[string]struct {
 		source EntityID
 		output string
 	}
 }
 
-// NewBaseEntity creates a new base entity.
+// NewBaseEntity creates a new base entity with no capabilities.
 func NewBaseEntity(id EntityID, entityType string) BaseEntity {
 	return BaseEntity{
 		id:          id,
 		entityType:  entityType,
+		capabilities: []Capability{},
+		inputs:      make(map[string]Input),
+		outputs:     make(map[string]Output),
+		connections: make(map[string]struct{ source EntityID; output string }),
+	}
+}
+
+// NewBaseEntityWithCapabilities creates a new base entity with capabilities.
+func NewBaseEntityWithCapabilities(id EntityID, entityType string, capabilities []Capability) BaseEntity {
+	return BaseEntity{
+		id:          id,
+		entityType:  entityType,
+		capabilities: capabilities,
 		inputs:      make(map[string]Input),
 		outputs:     make(map[string]Output),
 		connections: make(map[string]struct{ source EntityID; output string }),
@@ -165,6 +227,11 @@ func (e *BaseEntity) ID() EntityID {
 // Type returns the entity type.
 func (e *BaseEntity) Type() string {
 	return e.entityType
+}
+
+// Capabilities returns the entity's capabilities.
+func (e *BaseEntity) Capabilities() []Capability {
+	return e.capabilities
 }
 
 // Inputs returns all inputs.
@@ -302,6 +369,37 @@ func (w *simpleWorld) EntitiesByType(entityType string) []Entity {
 	result := make([]Entity, 0)
 	for _, e := range w.entities {
 		if e.Type() == entityType {
+			result = append(result, e)
+		}
+	}
+	return result
+}
+
+func (w *simpleWorld) EntitiesByCapability(capability Capability) []Entity {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	result := make([]Entity, 0)
+	for _, e := range w.entities {
+		if e.HasCapability(capability) {
+			result = append(result, e)
+		}
+	}
+	return result
+}
+
+func (w *simpleWorld) EntitiesByCapabilities(capabilities []Capability) []Entity {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	result := make([]Entity, 0)
+	for _, e := range w.entities {
+		hasAll := true
+		for _, cap := range capabilities {
+			if !e.HasCapability(cap) {
+				hasAll = false
+				break
+			}
+		}
+		if hasAll {
 			result = append(result, e)
 		}
 	}

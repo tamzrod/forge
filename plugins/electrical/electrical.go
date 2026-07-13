@@ -8,6 +8,7 @@ import (
 	"github.com/tamzrod/forge/plugin/validators"
 	"github.com/tamzrod/forge/registry"
 	"github.com/tamzrod/forge/registry/types"
+	"github.com/tamzrod/forge/world"
 )
 
 // Plugin implements the Forge Plugin interface for the electrical domain.
@@ -96,6 +97,75 @@ func (p *Plugin) Validators() []plugin.ConnectionValidator {
 	return []plugin.ConnectionValidator{
 		validators.NewElectricalValidator(),
 	}
+}
+
+// Templates implements plugin.Plugin.
+// Returns example electrical world templates.
+func (p *Plugin) Templates() []plugin.WorldTemplate {
+	return []plugin.WorldTemplate{
+		&EmptyWorldTemplate{},
+		&SolarFarmTemplate{},
+		&BatteryStorageTemplate{},
+		&DistributionFeederTemplate{},
+	}
+}
+
+// EmptyWorldTemplate is a minimal electrical world.
+type EmptyWorldTemplate struct{}
+
+func (t *EmptyWorldTemplate) ID() string   { return "electrical:empty" }
+func (t *EmptyWorldTemplate) Name() string { return "Empty Electrical World" }
+func (t *EmptyWorldTemplate) Description() string {
+	return "A minimal electrical world with no entities"
+}
+func (t *EmptyWorldTemplate) Domain() string { return "electrical" }
+func (t *EmptyWorldTemplate) Build() (world.World, error) {
+	return world.NewWorld(), nil
+}
+
+// SolarFarmTemplate is a simple solar farm.
+type SolarFarmTemplate struct{}
+
+func (t *SolarFarmTemplate) ID() string   { return "electrical:solar-farm" }
+func (t *SolarFarmTemplate) Name() string  { return "Solar Farm" }
+func (t *SolarFarmTemplate) Description() string {
+	return "A simple solar farm with grid connection"
+}
+func (t *SolarFarmTemplate) Domain() string { return "electrical" }
+func (t *SolarFarmTemplate) Build() (world.World, error) {
+	w := world.NewWorld()
+	// Add solar entities here
+	return w, nil
+}
+
+// BatteryStorageTemplate is a battery storage system.
+type BatteryStorageTemplate struct{}
+
+func (t *BatteryStorageTemplate) ID() string   { return "electrical:battery-storage" }
+func (t *BatteryStorageTemplate) Name() string { return "Battery Storage" }
+func (t *BatteryStorageTemplate) Description() string {
+	return "A battery energy storage system with grid connection"
+}
+func (t *BatteryStorageTemplate) Domain() string { return "electrical" }
+func (t *BatteryStorageTemplate) Build() (world.World, error) {
+	w := world.NewWorld()
+	// Add battery entities here
+	return w, nil
+}
+
+// DistributionFeederTemplate is a distribution feeder.
+type DistributionFeederTemplate struct{}
+
+func (t *DistributionFeederTemplate) ID() string   { return "electrical:distribution-feeder" }
+func (t *DistributionFeederTemplate) Name() string { return "Distribution Feeder" }
+func (t *DistributionFeederTemplate) Description() string {
+	return "A typical distribution feeder with grid, transformer, and loads"
+}
+func (t *DistributionFeederTemplate) Domain() string { return "electrical" }
+func (t *DistributionFeederTemplate) Build() (world.World, error) {
+	w := world.NewWorld()
+	// Add distribution entities here
+	return w, nil
 }
 
 // RegisterEntities implements plugin.Plugin.
