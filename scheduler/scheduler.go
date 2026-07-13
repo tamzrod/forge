@@ -210,16 +210,18 @@ func (s *Scheduler) tick() {
 	copy(models, s.models)
 	s.mu.Unlock()
 
-	// 1. Models evolve first (Simulation Models represent physics)
-	for _, m := range models {
-		m.Tick()
-	}
-
-	// 2. Devices observe models and update memory
+	// 1. Devices read models and SET power injections/withdrawals
+	//    (Devices sample current model state and report power flow)
 	for _, d := range devices {
 		if d.Running() {
 			d.Tick()
 		}
+	}
+
+	// 2. Models calculate new state based on power
+	//    (Bus voltages update based on P/Q injections)
+	for _, m := range models {
+		m.Tick()
 	}
 
 	// 3. Advance the clock

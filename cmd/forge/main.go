@@ -51,9 +51,9 @@ func main() {
 	feederBus := rt.CreateBusModel("bus-feeder", 480)
 	feederBreaker := rt.CreateBreakerModel("breaker-feeder", "bus-feeder", "bus-load")
 
-	// Loads on feeder bus
-	_ = rt.CreateLoadModel("load-building", "bus-feeder", 10.0)
-	_ = rt.CreateLoadModel("load-industrial", "bus-feeder", 20.0)
+	// Loads on feeder bus (in kW for 480V simulation)
+	_ = rt.CreateLoadModel("load-building", "bus-feeder", 10.0)   // 10 kW base load
+	_ = rt.CreateLoadModel("load-industrial", "bus-feeder", 20.0) // 20 kW base load
 
 	if *flagVerbose {
 		fmt.Println("Electrical System:")
@@ -232,24 +232,28 @@ func (b *meterBehavior) Tick() {
 	loadI := b.device.Model("load-industrial").(*models.LoadModel)
 	totalLoad := loadB.CurrentLoad() + loadI.CurrentLoad()
 
-	// Withdraw load from bus (if breaker closed)
+	// Withdraw load from bus only if breaker is closed
 	if !b.feederBreaker.IsOpen() {
 		b.feederBus.WithdrawPower(totalLoad)
 	}
 
-	// Net at bus
-	netPower := totalLoad - b.feederBus.PowerInjection()
+	// Read values from bus
+	pvGen := b.feederBus.PowerInjection()
+	feederV := b.feederBus.ActualVoltage()
+
+	// Net power (positive = consumption from grid, negative = export)
+	netPower := totalLoad - pvGen
 
 	// Write measurements
-	b.device.Memory().WriteFloat32("input_registers", 0, b.feederBus.ActualVoltage())
-	b.device.Memory().WriteFloat32("input_registers", 4, b.feederBus.PowerInjection())
-	b.device.Memory().WriteFloat32("input_registers", 8, totalLoad)
-	b.device.Memory().WriteFloat32("input_registers", 12, netPower)
+	b.device.Memory().WriteFloat32("input_registers", 0, feederV)        // Feeder voltage
+	b.device.Memory().WriteFloat32("input_registers", 4, pvGen)          // PV generation
+	b.device.Memory().WriteFloat32("input_registers", 8, totalLoad)      // Total load
+	b.device.Memory().WriteFloat32("input_registers", 12, netPower)      // Net power
 	var breakerStatus float32 = 0
 	if b.feederBreaker.IsOpen() {
 		breakerStatus = 1
 	}
-	b.device.Memory().WriteFloat32("input_registers", 16, breakerStatus)
+	b.device.Memory().WriteFloat32("input_registers", 16, breakerStatus) // Breaker status
 }
 
 type breakerControl struct {

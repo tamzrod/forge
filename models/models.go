@@ -501,24 +501,27 @@ func (b *BusModel) WithdrawPower(mw float32) {
 
 // Tick updates bus state based on power balance.
 func (b *BusModel) Tick() {
-	// Calculate power imbalance
+	// Calculate power imbalance (positive = generation surplus, negative = deficit)
 	netPower := b.powerInjection - b.powerWithdraw
 
-	// Voltage regulation: voltage drops when load exceeds generation
-	// and rises when generation exceeds load (simplified droop)
-	voltageDelta := netPower * 0.001 // 0.1% per MW
+	// Voltage regulation: voltage droops with load (like a real feeder)
+	// For a typical 480V distribution feeder with ~5% impedance:
+	// - At rated load, voltage drops ~2-3% due to feeder impedance
+	// - With no load, voltage is at source level
+	// - With generation exceeding load, voltage rises slightly
+	//
+	// Droop coefficient: 0.0001 per kW of power
+	// This gives ~0.1% voltage change per 1kW of power
+	// For 30kW load: ~3% voltage drop
+	voltageDelta := netPower * 0.0001
 	b.voltage += voltageDelta
-	b.voltage = clamp(b.voltage, 0.9, 1.1) // ±10% band
 
-	// Angle changes based on power flow (simplified)
-	angleDelta := netPower * 0.01
-	b.angle += angleDelta
-	if b.angle > 180 {
-		b.angle -= 360
-	}
-	if b.angle < -180 {
-		b.angle += 360
-	}
+	// Natural recovery toward nominal (governor-like response)
+	// Voltage returns toward 1.0 pu over time
+	b.voltage += (1.0 - b.voltage) * 0.05
+
+	// Keep voltage within reasonable bounds (±3%)
+	b.voltage = clamp(b.voltage, 0.97, 1.03)
 
 	// Reset for next tick
 	b.powerInjection = 0
@@ -600,12 +603,13 @@ func (t *TransformerModel) Tick() {
 }
 
 // LoadModel represents an electrical load.
+// All power values are in kW.
 type LoadModel struct {
 	ModelBase
 
 	// Load parameters
-	baseLoad   float32 // Base load in MW
-	alpha      float32 // Voltage exponent (0.5-1.5 typical)
+	baseLoad   float32 // Base load in kW
+	alpha      float32 // Voltage exponent (0.5-1.5 typical for composite load)
 	beta       float32 // Frequency exponent
 
 	// Dynamic load
@@ -618,14 +622,14 @@ func NewLoadModel(id ModelID, bus ModelID, baseLoad float32) *LoadModel {
 	return &LoadModel{
 		ModelBase:   NewModelBase(id, "load"),
 		baseLoad:    baseLoad,
-		alpha:       0.8,
+		alpha:       0.8, // Typical for composite load
 		beta:        1.0,
 		currentLoad: baseLoad,
 		busID:       bus,
 	}
 }
 
-// CurrentLoad returns the current load in MW.
+// CurrentLoad returns the current load in kW.
 func (l *LoadModel) CurrentLoad() float32 {
 	return l.currentLoad
 }
@@ -635,9 +639,10 @@ func (l *LoadModel) BusID() ModelID {
 	return l.busID
 }
 
-// Tick updates load based on time.
+// Tick updates load based on voltage.
+// Real loads are voltage-dependent: P = P0 * (V/V0)^alpha
 func (l *LoadModel) Tick() {
-	// Base load with small random variation
+	// Base load with small random variation (±5%)
 	delta := (float32(random()) - 0.5) * l.baseLoad * 0.05
 	l.currentLoad = l.baseLoad + delta
 	l.currentLoad = clamp(l.currentLoad, l.baseLoad*0.5, l.baseLoad*1.5)
