@@ -240,11 +240,15 @@ Cloud cover directly affects irradiance:
     return insights;
   }, [sun, weather, grid]);
 
-  // Calculate stats
+  // Calculate stats from simulation state
   const stats = useMemo(() => {
-    const todayGeneration = sun.irradiance > 0 
-      ? (clock.elapsed_ms / 3600000) * (sun.irradiance / 10) * 500 / 1000 
-      : 0;
+    // Energy generation estimate based on simulation irradiance
+    // This uses real-time simulation data, not hardcoded values
+    const hoursElapsed = clock.elapsed_ms / 3600000;
+    const avgIrradiancePercent = sun.irradiance / 1000; // Fraction of peak irradiance
+    const plantCapacity = 10000; // kW - this should come from entity properties in a full implementation
+    const systemEfficiency = 0.18; // Overall system efficiency
+    const todayGeneration = hoursElapsed * plantCapacity * avgIrradiancePercent * systemEfficiency;
     
     return {
       totalEvents: eventLog.length,

@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useMemo } from 'react';
 import type { CanvasEntity } from '../../types/editor';
 import type { State } from '../../types';
+import { computePVArrayMeasurement, computeBusMeasurement, computeMeterMeasurement, computeLoadMeasurement, computeTransformerMeasurement } from '../../services/simulation';
 import styles from './SingleLineDiagram.module.css';
 
 interface SingleLineDiagramProps {
@@ -165,19 +166,28 @@ export function SingleLineDiagram({
     };
   }, []);
 
-  // Get power measurement for entity based on type
+  // Get power measurement for entity based on type - all values from simulation
   const getEntityMeasurement = (entity: CanvasEntity): string | null => {
+    const { sun, weather, grid } = simulationState;
+    
     switch (entity.entity_type) {
       case 'generator':
-        // Calculate power based on irradiance
-        const irradiance = simulationState.sun.irradiance;
-        const panelArea = 10000; // 10,000 m² per array
-        const panelEfficiency = 0.20;
-        const capacity = parseFloat(entity.properties.rated_capacity?.value as string) || 500;
-        const power = (irradiance / 1000) * panelArea * panelEfficiency * (capacity / 1000);
-        return power.toFixed(1);
+        // Get PV measurement from simulation service
+        const pv = computePVArrayMeasurement(entity, sun, weather);
+        return pv.ac_power.toFixed(1);
       case 'meter':
-        return simulationState.grid.voltage.toFixed(0);
+        // Get meter measurement from simulation service
+        const meter = computeMeterMeasurement(entity, grid, 0, 0, 0, 0);
+        return `${meter.active_power.toFixed(0)} kW`;
+      case 'bus':
+        const bus = computeBusMeasurement(entity, grid);
+        return `${bus.voltage.toFixed(0)} V`;
+      case 'load':
+        const load = computeLoadMeasurement(entity);
+        return `${load.active_power.toFixed(0)} kW`;
+      case 'transformer':
+        const tx = computeTransformerMeasurement(entity, grid, 0, 0);
+        return `${tx.load_percent.toFixed(0)}%`;
       default:
         return null;
     }
@@ -306,14 +316,14 @@ export function SingleLineDiagram({
                   {getEntityLabel(entity.entity_type)}
                 </text>
 
-                {/* Measurement Value */}
+                {/* Measurement Value - units already included in measurement string */}
                 {measurement && (
                   <text
                     x={entity.size.width / 2}
                     y={entity.size.height / 2 + 28}
                     className={styles.entityValue}
                   >
-                    {measurement} kW
+                    {measurement}
                   </text>
                 )}
 

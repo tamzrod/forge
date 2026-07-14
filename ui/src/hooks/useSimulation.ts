@@ -43,6 +43,7 @@ const DEFAULT_STATE: State = {
     count: 0,
     devices: [],
   },
+  measurements: {},
 };
 
 function formatDuration(ns: number): string {
@@ -69,6 +70,7 @@ function transformState(raw: Record<string, unknown>): State {
   const weather = raw.weather as Record<string, unknown> || {};
   const grid = raw.grid as Record<string, unknown> || {};
   const devices = raw.devices as Record<string, unknown> || {};
+  const measurements = raw.measurements as Record<string, unknown> || {};
 
   return {
     clock: {
@@ -112,6 +114,7 @@ function transformState(raw: Record<string, unknown>): State {
       count: (devices.count as number) || 0,
       devices: (devices.devices as State['devices']['devices']) || [],
     },
+    measurements: measurements as State['measurements'],
   };
 }
 

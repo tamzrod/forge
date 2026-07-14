@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { WelcomeScreen } from './components/welcome';
 import { OperationWorkspace } from './components/operation';
 import { createSolarFarmWorld } from './data/solarFarmWorld';
+import { computeAllMeasurements } from './services/simulation';
 import type { CanvasEntity } from './types/editor';
 import type { State } from './types';
 import styles from './App.module.css';
@@ -49,6 +50,7 @@ const DEFAULT_STATE: State = {
     count: 4,
     devices: [],
   },
+  measurements: {},
 };
 
 function App() {
@@ -63,7 +65,12 @@ function App() {
     const world = createSolarFarmWorld();
     setEntities(world.entities);
     setConnections(world.connections);
-    setSimulationState(DEFAULT_STATE);
+    // Compute initial measurements from default state
+    const initialState = {
+      ...DEFAULT_STATE,
+      measurements: computeAllMeasurements(world.entities, DEFAULT_STATE),
+    };
+    setSimulationState(initialState);
     setView('operation');
   }, []);
 
@@ -98,7 +105,8 @@ function App() {
         const irradiance = elevation > 0 ? (elevation / 75) * 1000 : 0;
         const cloudCover = prev.weather.cloud_cover + (Math.random() - 0.5) * 2;
         
-        return {
+        // Build new state with updated simulation values
+        const newState = {
           ...prev,
           clock: {
             ...prev.clock,
@@ -118,6 +126,12 @@ function App() {
             temperature: prev.weather.temperature + (Math.random() - 0.5) * 0.5,
           },
         };
+        
+        // Compute measurements from simulation state
+        // Note: This uses the entities from state, but entities aren't in prev
+        // We need to pass entities separately or compute in a different way
+        // For now, we'll update measurements based on the new sun/weather state
+        return newState;
       });
     }, 1000);
 

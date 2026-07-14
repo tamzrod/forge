@@ -1,5 +1,6 @@
 import type { CanvasEntity } from '../../types/editor';
 import type { State } from '../../types';
+import { computePVArrayMeasurement, computeTransformerMeasurement, computeBusMeasurement, computeMeterMeasurement, computeLoadMeasurement } from '../../services/simulation';
 import styles from './EquipmentDetails.module.css';
 
 type EquipmentTab = 'explain' | 'measurements' | 'identity' | 'status' | 'properties';
@@ -55,34 +56,33 @@ export function EquipmentDetails({
 
   // Generate explain content based on entity type and simulation state
   const getExplainContent = () => {
-    const { sun, grid } = simulationState;
+    const { sun, grid, weather } = simulationState;
 
     switch (entity.entity_type) {
       case 'generator':
-        const irradiance = sun.irradiance;
+        const pvMeasurement = computePVArrayMeasurement(entity, sun, weather);
         const capacity = parseFloat(entity.properties.rated_capacity?.value as string) || 500;
-        const panelArea = 10000; // 10,000 m²
-        const efficiency = 0.20;
-        const theoreticalPower = irradiance / 1000 * panelArea * efficiency;
-        const actualPower = theoreticalPower * (capacity / 1000);
-        const utilization = (irradiance / 1000) * 100;
+        const panelArea = capacity / (1000 * 0.20); // m² (derived from capacity)
+        const theoreticalPower = (sun.irradiance / 1000) * panelArea * 0.20;
+        const utilization = (sun.irradiance / 1000) * 100;
 
         return {
           title: 'PV Array Power Generation',
-          content: `This PV array is currently generating ${actualPower.toFixed(1)} kW.
+          content: `This PV array is currently generating ${pvMeasurement.ac_power.toFixed(1)} kW.
           
 The power output depends on three factors:
-• Solar irradiance: ${irradiance.toFixed(0)} W/m² (${utilization.toFixed(0)}% of peak)
+• Solar irradiance: ${sun.irradiance.toFixed(0)} W/m² (${utilization.toFixed(0)}% of peak)
 • Array capacity: ${capacity} kW
-• Panel efficiency: 20%
+• Panel efficiency: ${(pvMeasurement.efficiency * 100).toFixed(0)}%
 
 The theoretical maximum power at current irradiance is ${theoreticalPower.toFixed(0)} kW. This array can produce up to ${capacity} kW under standard test conditions (1000 W/m²).
 
 ${sun.is_daytime ? 'Sun is above the horizon' : 'Sun is below the horizon - no generation'}`,
-          highlight: `${actualPower.toFixed(1)} kW`,
+          highlight: `${pvMeasurement.ac_power.toFixed(1)} kW`,
         };
 
       case 'meter':
+        // Meter measurements from simulation
         return {
           title: 'Grid Interconnection Point',
           content: `This revenue meter monitors power flow at the grid interconnection point.
@@ -97,6 +97,7 @@ ${grid.is_stable ? 'The grid is operating within normal parameters.' : 'Grid fre
         };
 
       case 'transformer':
+        const txMeasurement = computeTransformerMeasurement(entity, grid, 0, 0);
         return {
           title: 'Power Transformer',
           content: `This transformer steps voltage between the PV array and the utility grid.
@@ -104,19 +105,22 @@ ${grid.is_stable ? 'The grid is operating within normal parameters.' : 'Grid fre
 The transformer's tap position affects the secondary voltage. Current grid voltage is ${grid.voltage.toFixed(0)} V at the low voltage side.
 
 Typical transformer losses: 1-2%
-Operating temperature depends on load current and ambient conditions.`,
-          highlight: `${grid.voltage.toFixed(0)} V`,
+Operating temperature depends on load current and ambient conditions.
+Current load: ${txMeasurement.load_percent.toFixed(0)}%
+Oil temperature: ${txMeasurement.oil_temp.toFixed(0)}°C`,
+          highlight: `${txMeasurement.secondary_voltage.toFixed(0)} V`,
         };
 
       case 'bus':
+        const busMeasurement = computeBusMeasurement(entity, grid);
         return {
           title: 'Electrical Bus',
           content: `This bus distributes power within the solar farm collection system.
 
 Buses aggregate power from multiple PV arrays and route it through transformers to the grid connection point.
 
-Current bus voltage: ${grid.voltage.toFixed(0)} V`,
-          highlight: `${grid.voltage.toFixed(0)} V`,
+Current bus voltage: ${busMeasurement.voltage.toFixed(0)} V (${(busMeasurement.voltage_pu * 100).toFixed(1)}% of nominal)`,
+          highlight: `${busMeasurement.voltage.toFixed(0)} V`,
         };
 
       case 'grid':
@@ -143,44 +147,59 @@ The grid must remain stable for this plant to export power.`,
     }
   };
 
-  // Get measurements based on entity type
+  // Get measurements based on entity type - all values from simulation
   const getMeasurements = () => {
     const { sun, weather, grid } = simulationState;
 
     switch (entity.entity_type) {
       case 'generator':
-        const irradiance = sun.irradiance;
+        const pv = computePVArrayMeasurement(entity, sun, weather);
         const capacity = parseFloat(entity.properties.rated_capacity?.value as string) || 500;
-        const panelArea = 10000;
-        const efficiency = 0.20;
-        const power = irradiance / 1000 * panelArea * efficiency * (capacity / 1000);
-        const dcVoltage = 400;
-        const dcCurrent = power / dcVoltage;
-        const acPower = power * 0.98; // Inverter losses
 
         return [
-          { name: 'Active Power', value: acPower.toFixed(1), unit: 'kW', max: capacity },
-          { name: 'DC Power', value: power.toFixed(1), unit: 'kW', max: capacity },
-          { name: 'Irradiance', value: irradiance.toFixed(0), unit: 'W/m²', max: 1000 },
-          { name: 'DC Voltage', value: dcVoltage.toFixed(0), unit: 'V', max: 600 },
-          { name: 'DC Current', value: dcCurrent.toFixed(1), unit: 'A', max: 2000 },
-          { name: 'Temperature', value: weather.temperature.toFixed(1), unit: '°C', max: 60 },
+          { name: 'Active Power', value: pv.ac_power.toFixed(1), unit: 'kW', max: capacity },
+          { name: 'DC Power', value: pv.dc_power.toFixed(1), unit: 'kW', max: capacity },
+          { name: 'Irradiance', value: sun.irradiance.toFixed(0), unit: 'W/m²', max: 1000 },
+          { name: 'DC Voltage', value: pv.dc_voltage.toFixed(0), unit: 'V', max: 600 },
+          { name: 'DC Current', value: pv.dc_current.toFixed(1), unit: 'A', max: 2000 },
+          { name: 'Inverter Temp', value: pv.inverter_temp.toFixed(1), unit: '°C', max: 80 },
+          { name: 'Efficiency', value: (pv.efficiency * 100).toFixed(1), unit: '%', max: 100 },
         ];
 
       case 'meter':
+        const meter = computeMeterMeasurement(entity, grid, 0, 0, 0, 0);
         return [
           { name: 'Voltage', value: grid.voltage.toFixed(0), unit: 'V', max: 600, status: grid.voltage_pu < 0.95 ? 'warning' : 'normal' },
           { name: 'Frequency', value: grid.frequency.toFixed(2), unit: 'Hz', max: 62, status: !grid.is_stable ? 'error' : 'normal' },
-          { name: 'Active Power', value: (simulationState.sun.irradiance * 10).toFixed(0), unit: 'kW', max: 1000 },
-          { name: 'Power Factor', value: '0.99', unit: '', max: 1 },
+          { name: 'Active Power', value: meter.active_power.toFixed(1), unit: 'kW', max: 10000 },
+          { name: 'Reactive Power', value: meter.reactive_power.toFixed(1), unit: 'kVAr', max: 1000 },
+          { name: 'Power Factor', value: meter.power_factor.toFixed(2), unit: '', max: 1 },
         ];
 
       case 'transformer':
+        const tx = computeTransformerMeasurement(entity, grid, 0, 0);
+        const hvVoltage = parseFloat(entity.properties.hv_voltage?.value as string) || 34500;
         return [
-          { name: 'Primary Voltage', value: grid.voltage.toFixed(0), unit: 'V', max: 80000 },
-          { name: 'Secondary Voltage', value: grid.voltage.toFixed(0), unit: 'V', max: 600 },
-          { name: 'Load', value: '45', unit: '%', max: 100 },
-          { name: 'Temperature', value: '45', unit: '°C', max: 120 },
+          { name: 'Primary Voltage', value: tx.primary_voltage.toFixed(0), unit: 'V', max: hvVoltage * 1.1 },
+          { name: 'Secondary Voltage', value: tx.secondary_voltage.toFixed(0), unit: 'V', max: 600 },
+          { name: 'Load', value: tx.load_percent.toFixed(1), unit: '%', max: 100 },
+          { name: 'Oil Temperature', value: tx.oil_temp.toFixed(1), unit: '°C', max: 120 },
+          { name: 'Tap Position', value: tx.tap_position.toFixed(0), unit: '', max: 20 },
+        ];
+
+      case 'bus':
+        const bus = computeBusMeasurement(entity, grid);
+        return [
+          { name: 'Voltage', value: bus.voltage.toFixed(0), unit: 'V', max: 600 },
+          { name: 'Voltage (PU)', value: bus.voltage_pu.toFixed(4), unit: 'PU', max: 1.1 },
+          { name: 'Frequency', value: bus.frequency.toFixed(2), unit: 'Hz', max: 62 },
+        ];
+
+      case 'load':
+        const load = computeLoadMeasurement(entity);
+        return [
+          { name: 'Active Power', value: load.active_power.toFixed(1), unit: 'kW', max: 200 },
+          { name: 'Power Factor', value: load.power_factor.toFixed(2), unit: '', max: 1 },
         ];
 
       default:

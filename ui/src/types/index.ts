@@ -41,6 +41,63 @@ export interface GridState {
   nominal_frequency: number;
 }
 
+// Equipment-specific measurements from simulation
+export interface PVArrayMeasurement {
+  dc_power: number;         // DC power output in kW
+  ac_power: number;         // AC power output after inverter in kW
+  dc_voltage: number;       // DC voltage in V
+  dc_current: number;       // DC current in A
+  efficiency: number;       // Overall efficiency (0-1)
+  inverter_temp: number;    // Inverter temperature in °C
+  operating_state: 'generating' | 'standby' | 'fault' | 'night';
+}
+
+export interface TransformerMeasurement {
+  primary_voltage: number;  // Primary side voltage in V
+  secondary_voltage: number; // Secondary side voltage in V
+  load_percent: number;     // Current load as percentage
+  oil_temp: number;         // Oil temperature in °C
+  tap_position: number;     // Tap changer position
+}
+
+export interface BusMeasurement {
+  voltage: number;         // Bus voltage in V
+  voltage_pu: number;      // Per-unit voltage
+  frequency: number;        // Frequency in Hz
+}
+
+export interface MeterMeasurement {
+  voltage: number;          // Voltage in V
+  frequency: number;        // Frequency in Hz
+  active_power: number;     // Active power in kW
+  reactive_power: number;   // Reactive power in kVAr
+  power_factor: number;     // Power factor
+  energy_export: number;    // Exported energy in kWh
+  energy_import: number;    // Imported energy in kWh
+}
+
+export interface BreakerMeasurement {
+  is_open: boolean;        // Breaker status
+  trip_count: number;      // Number of trips
+}
+
+export interface LoadMeasurement {
+  active_power: number;     // Active power demand in kW
+  power_factor: number;     // Power factor
+}
+
+// Entity measurements indexed by entity ID
+export interface EntityMeasurements {
+  [entityId: string]: 
+    | PVArrayMeasurement 
+    | TransformerMeasurement 
+    | BusMeasurement 
+    | MeterMeasurement 
+    | BreakerMeasurement 
+    | LoadMeasurement 
+    | Record<string, never>; // Empty for unknown entities
+}
+
 export interface InterfaceInfo {
   enabled: boolean;
   connected: boolean;
@@ -69,6 +126,7 @@ export interface State {
   weather: WeatherState;
   grid: GridState;
   devices: DevicesState;
+  measurements: EntityMeasurements;
 }
 
 // World Explorer Tree Types
