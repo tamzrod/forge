@@ -5,6 +5,7 @@ import { PlantExplorer } from './PlantExplorer';
 import { SingleLineDiagram } from './SingleLineDiagram';
 import { EquipmentDetails } from './EquipmentDetails';
 import { AnalysisPanel } from './AnalysisPanel';
+import { PlantHealthDashboard } from './PlantHealthDashboard';
 import styles from './OperationWorkspace.module.css';
 
 export interface OperationWorkspaceProps {
@@ -24,7 +25,7 @@ export interface OperationWorkspaceProps {
   scenarios?: Array<{ id: string; name: string }>;
 }
 
-type SidebarTab = 'plant' | 'analysis';
+type SidebarTab = 'dashboard' | 'plant' | 'analysis';
 type EquipmentTab = 'explain' | 'measurements' | 'identity' | 'status' | 'properties';
 type AnalysisTab = 'timeline' | 'events' | 'why';
 
@@ -42,7 +43,7 @@ export function OperationWorkspace({
 }: OperationWorkspaceProps) {
   // State
   const [selection, setSelection] = useState<string | null>(null);
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('plant');
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('dashboard');
   const [equipmentTab, setEquipmentTab] = useState<EquipmentTab>('explain');
   const [analysisTab, setAnalysisTab] = useState<AnalysisTab>('timeline');
 
@@ -200,9 +201,15 @@ export function OperationWorkspace({
 
       {/* Main Content */}
       <div className={styles.main}>
-        {/* Sidebar - Plant/Analysis */}
+        {/* Sidebar - Dashboard/Plant/Analysis */}
         <div className={styles.sidebar}>
           <div className={styles.sidebarTabs}>
+            <button
+              className={`${styles.sidebarTab} ${sidebarTab === 'dashboard' ? styles.active : ''}`}
+              onClick={() => setSidebarTab('dashboard')}
+            >
+              Health
+            </button>
             <button
               className={`${styles.sidebarTab} ${sidebarTab === 'plant' ? styles.active : ''}`}
               onClick={() => setSidebarTab('plant')}
@@ -217,7 +224,16 @@ export function OperationWorkspace({
             </button>
           </div>
           <div className={styles.sidebarContent}>
-            {sidebarTab === 'plant' ? (
+            {sidebarTab === 'dashboard' ? (
+              <PlantHealthDashboard
+                entities={entities}
+                simulationState={simulationState}
+                onSelectEntity={(id) => {
+                  handleSelect(id);
+                  setSidebarTab('plant');
+                }}
+              />
+            ) : sidebarTab === 'plant' ? (
               <PlantExplorer
                 tree={buildPlantTree()}
                 selectedId={selection}

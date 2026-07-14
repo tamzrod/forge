@@ -95,6 +95,45 @@
   fill: #f44336;
 }
 
+/* IEEE Symbols (P0-1) */
+.ieeeSymbol {
+  overflow: visible;
+}
+
+.symbolPath {
+  stroke: #d4d4d4;
+  fill: none;
+}
+
+.entity.selected .symbolPath {
+  stroke: #ff6f00;
+}
+
+.entity:hover .symbolPath {
+  stroke: #4caf50;
+}
+
+/* Equipment Designations (P0-4) */
+.designation {
+  fill: #ff6f00;
+  font-size: 10px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+}
+
+/* Entity Names */
+.entityName {
+  fill: #9d9d9d;
+  font-size: 9px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+}
+
 /* Equipment Terminals */
 .terminal {
   fill: #6e6e6e;

@@ -1,0 +1,218 @@
+/* Plant Health Dashboard Styles (P0-2, P0-3)
+ * 
+ * Design constraint: Must remain high-level summary, not SCADA dashboard.
+ * - Shows aggregates, deviations, and anomalies
+ * - Does not show every sensor reading
+ * - Does not support sub-second updates
+ * - Does not replace operator station displays
+ */
+
+.dashboard {
+  background: #252526;
+  border-radius: 8px;
+  padding: 16px;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Plant Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.plantInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plantName {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.plantSize {
+  font-size: 12px;
+  color: #9d9d9d;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+.statusBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #2d2d2d;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #d4d4d4;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.statusDot.daytime {
+  background: #ffc107;
+  box-shadow: 0 0 8px #ffc107;
+}
+
+.statusDot.nighttime {
+  background: #5c6bc0;
+}
+
+/* Primary KPIs */
+.primaryKpis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.kpiCard {
+  background: #2d2d2d;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpiLabel {
+  font-size: 11px;
+  color: #9d9d9d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kpiValue {
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.kpiUnit {
+  font-size: 14px;
+  font-weight: 400;
+  color: #9d9d9d;
+}
+
+.kpiSubtext {
+  font-size: 10px;
+  color: #6e6e6e;
+}
+
+/* Environment Summary */
+.envSummary {
+  display: flex;
+  gap: 16px;
+  padding: 12px;
+  background: #2d2d2d;
+  border-radius: 8px;
+}
+
+.envItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.envLabel {
+  font-size: 10px;
+  color: #6e6e6e;
+  text-transform: uppercase;
+}
+
+.envValue {
+  font-size: 12px;
+  color: #d4d4d4;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+.envValue.stable {
+  color: #4caf50;
+}
+
+.envValue.unstable {
+  color: #f44336;
+}
+
+/* Array Status */
+.arrayStatus {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #d4d4d4;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.arrayGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.arrayCard {
+  background: #2d2d2d;
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-left: 3px solid transparent;
+}
+
+.arrayCard:hover {
+  background: #3c3c3c;
+}
+
+.arrayCard.healthy {
+  border-left-color: #4caf50;
+}
+
+.arrayCard.warning {
+  border-left-color: #ff9800;
+}
+
+.arrayCard.fault {
+  border-left-color: #f44336;
+}
+
+.arrayDesignation {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ff6f00;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+.arrayGeneration {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+.arrayDeviation {
+  font-size: 9px;
+  color: #6e6e6e;
+}

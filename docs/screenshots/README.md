@@ -54,6 +54,16 @@ This directory contains screenshots captured during the KDSE implementation acce
 **Description:** Complete overview of the Operation Workspace with all panels visible, the plant hierarchy expanded, and the simulation running. Shows the complete KDSE data flow from simulation to UI.  
 **Functionality Demonstrated:** Full application overview demonstrating the complete KDSE implementation.
 
+### 11-plant-health-dashboard-p0.png
+**Title:** Plant Health Dashboard (P0-2, P0-3)  
+**Description:** The new Plant Health Dashboard showing plant name, total generation (MW), today's energy (MWh), capacity factor (%), performance ratio (%), environment summary (irradiance, temperature, grid status), and individual PV array status cards.  
+**Functionality Demonstrated:** High-level operational KPIs and array status for operators.
+
+### 12-plant-health-dashboard-p0.png
+**Title:** Plant Health Dashboard Array Status  
+**Description:** Detail view of the Plant Health Dashboard showing individual PV array status cards (PV-01, PV-02, PV-03, PV-04) with generation values and deviation from expected.  
+**Functionality Demonstrated:** Array-level health monitoring with deviation indicators.
+
 ---
 
 ## Testing Notes

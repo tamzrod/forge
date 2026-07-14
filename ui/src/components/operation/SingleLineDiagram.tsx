@@ -20,24 +20,76 @@ interface PanState {
   panY: number;
 }
 
-const ENTITY_ICONS: Record<string, string> = {
-  grid: '🔌',
-  bus: '⚫',
-  breaker: '🔀',
-  transformer: '🔄',
-  generator: '☀️',
-  load: '🏭',
-  meter: '📊',
+// IEEE Std 315 / ANSI standard SVG symbols for electrical equipment
+const IEEE_SYMBOLS: Record<string, {
+  path: string;
+  viewBox: string;
+  typeLabel: string;
+}> = {
+  // Grid: Circle with G (utility source)
+  grid: {
+    path: 'M -25,-25 L 25,-25 L 25,25 L -25,25 Z M -18,-18 L 18,-18 L 18,18 L -18,18 Z',
+    viewBox: '-30 -30 60 60',
+    typeLabel: 'GND'
+  },
+  // Bus: Horizontal bar (common connection point)
+  bus: {
+    path: 'M -35,0 L 35,0',
+    viewBox: '-40 -10 80 20',
+    typeLabel: 'BUS'
+  },
+  // Circuit Breaker: Rectangle with X (ANSI style)
+  breaker: {
+    path: 'M -25,-20 L 25,-20 L 25,20 L -25,20 Z M -20,-15 L 20,-15 L 20,15 L -20,15 Z M -8,-8 L 8,8 M 8,-8 L -8,8',
+    viewBox: '-30 -25 60 50',
+    typeLabel: 'CB'
+  },
+  // Transformer: Circle with ratio notation
+  transformer: {
+    path: 'M 0,-25 A 25,25 0 1,1 0,25 A 25,25 0 1,1 0,-25 M -15,-15 A 15,15 0 1,0 -15,15 A 15,15 0 1,0 -15,-15',
+    viewBox: '-30 -30 60 60',
+    typeLabel: 'TX'
+  },
+  // Generator/PV Array: Circle with arrow (power source)
+  generator: {
+    path: 'M 0,-25 A 25,25 0 1,1 0,25 A 25,25 0 1,1 0,-25 M 0,-12 L 12,0 L 0,12 Z M -15,-15 L 15,15',
+    viewBox: '-30 -30 60 60',
+    typeLabel: 'GEN'
+  },
+  // Load: Filled rectangle with resistance lines
+  load: {
+    path: 'M -25,-15 L 25,-15 L 25,15 L -25,15 Z M -20,-5 L -10,-5 L -15,5 L -5,5 L -10,-5 L 0,5 L 5,-5 L 15,5 L 10,-5 L 20,5',
+    viewBox: '-30 -20 60 40',
+    typeLabel: 'LOAD'
+  },
+  // Meter/Revenue Meter: Circle with M
+  meter: {
+    path: 'M 0,-25 A 25,25 0 1,1 0,25 A 25,25 0 1,1 0,-25',
+    viewBox: '-30 -30 60 60',
+    typeLabel: 'MTR'
+  }
 };
 
-const ENTITY_LABELS: Record<string, string> = {
-  grid: 'GRID',
-  bus: 'BUS',
-  breaker: 'CB',
-  transformer: 'TX',
-  generator: 'PV',
-  load: 'LOAD',
-  meter: 'MTR',
+// Get equipment designation from entity ID (P0-4: Equipment designations)
+const getEquipmentDesignation = (entity: CanvasEntity): string => {
+  const id = entity.id;
+  
+  // Extract designation patterns
+  if (id.includes('grid')) return 'PCC';
+  if (id.includes('meter')) return 'MTR';
+  if (id.includes('tx') || id.includes('transformer')) return 'TX-1';
+  if (id.includes('bus')) return 'BUS-A';
+  if (id.includes('breaker')) {
+    const match = id.match(/breaker[-_]?(\d+)/i);
+    return `CB-${match ? match[1].padStart(3, '0') : '001'}`;
+  }
+  if (id.includes('pv') || id.includes('generator')) {
+    const match = id.match(/[-_]?(\d+)$/i);
+    return `PV-${match ? match[1].padStart(2, '0') : '01'}`;
+  }
+  if (id.includes('load')) return 'LOAD-1';
+  
+  return id.toUpperCase().slice(0, 6);
 };
 
 export function SingleLineDiagram({
@@ -193,9 +245,14 @@ export function SingleLineDiagram({
     }
   };
 
-  // Get entity icon
-  const getEntityIcon = (type: string) => ENTITY_ICONS[type] || '📦';
-  const getEntityLabel = (type: string) => ENTITY_LABELS[type] || type.toUpperCase();
+  // Get IEEE symbol for entity type
+  const getIEEESymbol = (type: string) => {
+    return IEEE_SYMBOLS[type] || {
+      path: 'M -20,-20 L 20,-20 L 20,20 L -20,20 Z',
+      viewBox: '-25 -25 50 50',
+      typeLabel: type.toUpperCase().slice(0, 4)
+    };
+  };
 
   return (
     <div
@@ -283,6 +340,9 @@ export function SingleLineDiagram({
           {entities.map((entity) => {
             const isSelected = selection === entity.id;
             const measurement = getEntityMeasurement(entity);
+            const ieeeSymbol = getIEEESymbol(entity.entity_type);
+            const designation = getEquipmentDesignation(entity);
+            const isBus = entity.entity_type === 'bus';
 
             return (
               <g
@@ -291,36 +351,47 @@ export function SingleLineDiagram({
                 transform={`translate(${entity.position.x}, ${entity.position.y})`}
                 onClick={(e) => handleEntityClick(entity.id, e)}
               >
-                {/* Background */}
-                <rect
-                  width={entity.size.width}
-                  height={entity.size.height}
-                  className={styles.entityBackground}
-                />
+                {/* IEEE Symbol */}
+                <svg
+                  x={isBus ? entity.size.width / 2 - 35 : 5}
+                  y={isBus ? entity.size.height / 2 - 5 : 5}
+                  width={isBus ? 70 : entity.size.width - 10}
+                  height={isBus ? 10 : entity.size.height - 10}
+                  viewBox={ieeeSymbol.viewBox}
+                  className={styles.ieeeSymbol}
+                >
+                  <path
+                    d={ieeeSymbol.path}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className={styles.symbolPath}
+                  />
+                </svg>
 
-                {/* Icon */}
+                {/* Equipment Designation (P0-4) */}
                 <text
                   x={entity.size.width / 2}
-                  y={entity.size.height / 2 - (measurement ? 6 : 0)}
-                  className={styles.entityIcon}
+                  y={isBus ? entity.size.height / 2 - 12 : entity.size.height / 2 - 20}
+                  className={styles.designation}
                 >
-                  {getEntityIcon(entity.entity_type)}
+                  {designation}
                 </text>
 
-                {/* Label */}
+                {/* Entity Name */}
                 <text
                   x={entity.size.width / 2}
-                  y={entity.size.height / 2 + 14}
-                  className={styles.entityLabel}
+                  y={isBus ? entity.size.height / 2 + 8 : entity.size.height / 2}
+                  className={styles.entityName}
                 >
-                  {getEntityLabel(entity.entity_type)}
+                  {entity.name.split(' ').slice(0, 3).join(' ')}
                 </text>
 
-                {/* Measurement Value - units already included in measurement string */}
+                {/* Measurement Value */}
                 {measurement && (
                   <text
                     x={entity.size.width / 2}
-                    y={entity.size.height / 2 + 28}
+                    y={isBus ? entity.size.height / 2 + 22 : entity.size.height / 2 + 20}
                     className={styles.entityValue}
                   >
                     {measurement}
