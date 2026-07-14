@@ -20,9 +20,14 @@
     "initialized": false
   },
   "directories": {
+    "context": ".kdse/context.json",
     "knowledge": ".kdse/knowledge",
     "runtime": ".kdse/runtime",
     "reports": ".kdse/reports",
+    "evidence": ".kdse/evidence",
+    "evidence_screenshots": ".kdse/evidence/screenshots",
+    "evidence_tests": ".kdse/evidence/tests",
+    "evidence_benchmarks": ".kdse/evidence/benchmarks",
     "history": ".kdse/history",
     "phase0": ".kdse/phase0",
     "architecture": ".kdse/architecture",
